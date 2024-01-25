@@ -173,6 +173,7 @@ server <- function(input, output) {
 		
 		## Merging melted datasets
 		dat <- merge(dat_melted, ods_melted, by = c("row_name", "col_name", "stock_well"))
+		
 		## Ordering the data for single pipette work. 
 		setorderv(dat, c("col_name", "row_name"), c(1, -1))
 
