@@ -11,51 +11,48 @@ if (!require("shiny", quietly = TRUE))
     install.packages("shiny")
 if (!require("dplyr", quietly = TRUE))
     install.packages("dplyr")
+if (!require("httpuv", quietly = TRUE))
+    install.packages("httpuv")
 if (!require("ggplot2", quietly = TRUE))
     install.packages("ggplot2")
 if (!require("openxlsx", quietly = TRUE))
     install.packages("openxlsx")
+if (!require("shinylive", quietly = TRUE))
+    install.packages("shinylive")
 if (!require("data.table", quietly = TRUE))
     install.packages("data.table")
 
 suppressMessages(library("data.table"))
+suppressMessages(library("shinylive"))
 suppressMessages(library("openxlsx"))
 suppressMessages(library("ggplot2"))
+suppressMessages(library("httpuv"))
 suppressMessages(library("dplyr"))
 suppressMessages(library("shiny"))
 suppressMessages(library("DT"))
 
 ## Just for setting the working dir when adjusting things. 
 setwd("C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/od_calculator")
+logo_src <- "https://resurrect.bio/assets/images/logo/colour.png"
 
-## Define functions
-
-
-## Define default data
-od_table <- data.table(	Row = letters[1:8] %>% toupper(),
-						V1 = rep(0.1, 8), V2 = rep(0.1, 8),
-						V3 = rep(0.1, 8), V4 = rep(0.1, 8),
-						V5 = rep(0.1, 8), V6 = rep(0.1, 8),
-						V7 = rep(0.1, 8), V8 = rep(0.1, 8),
-						V9 = rep(0.1, 8), V10 = rep(0.1, 8),
-						V11 = rep(0.1, 8), V12 = rep(0.1, 8))
-
-# Define UI ----
-##img(src='rb_logo.png', align = "top", height = 30, width = 100),
+## ~~~~~~~~~~~~~~~~~~~~~~~~~~ Define UI
 ui <- fluidPage(
-	titlePanel(strong("RB OD Calculator: A tool to calculate aliquot volumes for the FeliX.")),
+	titlePanel("RB OD Calculator: A tool to calculate aliquot volumes for the FeliX." %>% strong()),
     sidebarLayout(
     	sidebarPanel(
-	    	h2("Input data:"),
-		    # Input: Select a file ----
-		    fileInput("xslx_file", "Platereader XSLX File",
-        	    multiple = FALSE),
-
-	    	h4("Calculation parameters:"),
+    		width = 3,
+	    	h3("Mandatory input data:"),
+		    fileInput("xslx_file", "Platereader XSLX File", multiple = FALSE),
+	    	
+	    	h3("Optional input data:"),
+		    fileInput("od_csv", "Target OD CSV upload", multiple = FALSE),
+	    	hr(),
+	    	
+	    	h3("Calculation parameters:"),
 		    textInput("run_name", "Name of Run:", value = "", placeholder = "N77_AA13"),
 		    textInput("blank_col", "Blank column:", value = "12"),
 		    textInput("target_ul", "Target volume (ul):", value = "1000"),
-		    textInput("drift", "Platereader drift:", value = "3.95"),
+		    textInput("drift", "Platereader drift:", value = "4.25"),
 		    textInput("last_well", "Last well in use:", value = "A11"),
  
     		hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
@@ -64,11 +61,19 @@ ui <- fluidPage(
 	    
 	    mainPanel(
 		    tabsetPanel(
-	    		tabPanel("Input",
+	    		tabPanel("Target ODs",
 			    	hr(),
 		    		h2("Target OD table:"),
+		    		radioButtons("in_od_table_source", h4("Source of target OD table:"),
+						  choices = list("Homogeneous table" = 2, "Editable table" = 1, "Upload CSV" = 0), selected = 1, inline = TRUE),
+		    		radioButtons("default_od", h4("Default target OD for homogeneous table:"),
+						  choices = list("0.05" = "0.05", "0.1" = "0.1", "0.2" = "0.2", "0.3" = "0.3"), selected = "0.1", inline = TRUE),
+			    	hr(),
 		    		h5("Please adjust values to reflect target OD FeliX will aim to achieve."),
-		    		h5("Note: Leave unused wells at default 0.1."),
+		    		h5("Note: Ignore values in unused wells."),
+		    		#DTOutput("homogeneous_od_table"),
+		    		#DTOutput("input_csv_table"),
+		    		DTOutput("all_od_tabs"),
 		    		DTOutput("reactive_od_table")
 	    		),
 
@@ -77,13 +82,14 @@ ui <- fluidPage(
 		    		h2("Input XLSX table from platereader:"),
 		    		h5("An uneditable version of the platereader plate input file. Mostly for debugging purposes."),
 		    		h5("If no results are showing, please press Submit again once file path has been selected."),
-		    		DTOutput("pr_tab"),
-		    		#textOutput("debug_out")
+		    		DTOutput("pr_tab")
 				),
 
 	    		tabPanel("Output",
 	    			hr(),
 		    		h2("Summary Output Table:"),
+            		actionButton("calc_go",label = "Calculate"),
+            		hr(),
 		    		downloadButton("downloadsumData", "Download FeliX Input Table"),
 			    	hr(),
 		    		DTOutput("out_tab_summ"),
@@ -92,7 +98,6 @@ ui <- fluidPage(
 		    		downloadButton("downloadfullData", "Download Full Output Table"),
 			    	hr(),
 		    		DTOutput("out_tab_full")
-		    		
 				),
 
 	    		tabPanel("Instructions",
@@ -108,6 +113,11 @@ ui <- fluidPage(
 	    			h5("1. Due to how FeliX operated, wells need to be filled from H -> A for each column."),
 	    			h5("2. Wells cannot be skipped. These will have to be manually removed after FeliX is complete."),
 				),
+	    		
+	    		tabPanel("Debug",
+		    		DTOutput("debug_out_tab"),
+            		textOutput("debug_out_print")
+				),
 	    	),
 		)
 	)
@@ -116,6 +126,7 @@ ui <- fluidPage(
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Define server logic
 server <- function(input, output) {
     ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Redundancy around adjustable input values
+    ## ~~ Setting up callable reactive variables, might be overkill. 
     run_name <- reactive({
     	run_name <- input$run_name %>% trimws
     })
@@ -131,8 +142,14 @@ server <- function(input, output) {
     last_well <- reactive({
     	last_well <- input$last_well %>% trimws
     })
+    in_od_table_val <- reactive({
+    	in_od_table_val <- input$in_od_table_source %>% as.numeric
+    })
+    dod <- reactive({
+    	dod <- input$default_od %>% as.numeric
+    })
 
-    ## Reading data in platereader data
+    ## ~~ Reading data in platereader data
     xlsx_in <- reactive({
     	req(input$xslx_file)
     	df <- read.xlsx(input$xslx_file$datapath,
@@ -142,8 +159,9 @@ server <- function(input, output) {
     	df
     })
 
-    ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Start of calculations
-    calc_dat <- reactive({
+    ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Calculations
+    ## ~~ Main OD calculation function
+    calc_dat <- reactive({    	
     	## Removing redundant data
     	dat <- xlsx_in()[!c(9,10),!1] %>% as.data.frame
     	
@@ -164,7 +182,17 @@ server <- function(input, output) {
 		names(dat_melted) <- c("row_name", "col_name", "diluted_plate_od_dc")
 		dat_melted[,"stock_well" := paste0(gsub(pattern = "V", replacement = "", col_name), row_name)]
 
-		ods <- target_od_dat$data %>% as.data.table
+		#choices = list("Homogeneous table" = 2, 
+ 		#"Editable table" = 1, "Upload CSV" = 0)
+		iotv <- in_od_table_val() %>% as.numeric
+		if(iotv == 0){
+			ods <- read_input_ods()
+		} else if(iotv == 1){
+			ods <- isolate(target_od_dat$data) %>% as.data.table
+		} else if(iotv == 2){
+			ods <- set_default_tab()
+		}
+		#ods <- ods %>% as.data.table
 		ods[,"Row"] <- NULL
 		ods[,"row_name" := letters[1:8] %>% toupper()]
 		ods_melted <- melt(ods, id.vars=c("row_name")) 
@@ -186,28 +214,37 @@ server <- function(input, output) {
 		dat[,"stock_vol" := calc_stock(1:nrow(dat))]
 		dat[,"ai_vol" := temp_target_vol - stock_vol %>% round(., digits = 1)]
 		dat
+		#ods
     })
-
+    ## ~~ Creating FeliX input table
     adjust_dat <- reactive({
+    	#req(input$calc_go)
     	dat <- calc_dat() %>% as.data.table
-    	dat[,c("stock_well", "stock_vol", "ai_vol")]
+    	lw <- last_well() %>% as.character
+    	## Implemented the last well filter
+    	#print(lw)
+    	#lw <- "B1"
+    	lw_char <- paste0(gsub(pattern = "([A-z]?)([0-9]+)([A-z]?)", replacement = "\\2", lw),
+    		gsub(pattern = "([A-z]?)([0-9]+)([A-z]?)", replacement = "\\1\\3", lw)
+    	)
+    	lw_num <- which(dat$stock_well == lw_char)
+    	#print(lw_char); print(lw_num)
+    	dat[1:lw_num,c("stock_well", "stock_vol", "ai_vol")]
     })
 
     ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Printing tables and download handling
-    ## Just to be able to inspect them manually if results are weird
+    ## ~~ Rendering data tables for inspection
     output$pr_tab <- renderDT({
-    	#datatable(calc_dat(), rownames= FALSE)
     	datatable(xlsx_in(), rownames= FALSE)
     })
-    
     output$out_tab_full <- renderDT({
     	datatable(calc_dat(), rownames= FALSE)
     })
-
 	output$out_tab_summ <- renderDT({
     	datatable(adjust_dat(), rownames= FALSE)
     })
 
+	## ~~ Handing download for datasets
 	output$downloadsumData <- downloadHandler(
 		filename = function() {
 			paste0(run_name(), "_", format(Sys.Date(), "%d%m%Y"), ".txt")
@@ -224,28 +261,104 @@ server <- function(input, output) {
 			write.csv(calc_dat(), file, row.names = FALSE, col.names = FALSE, quote = FALSE)
 		}
 	)
-    #output$debug_out <- renderText({ 
-    #	calc_dat()
-  	#})
-
-
-    ## Reactive OD table
-    ## Needs to be fixed!!!! - can't see why the values are not updating. 
-    ## Something about inputs is clearly being lost
-	target_od_dat <- reactiveValues(data = od_table)
-    output$reactive_od_table <- renderDT({
-        datatable(target_od_dat$data, editable = TRUE, rownames= FALSE)
+    
+    ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Target OD tables
+	## ~~ Define default depending on input source data
+    #od_table_reactive <- 
+    set_default_tab <- reactive({
+    	dod1 <- dod()
+		od_table <- data.table( Row = letters[1:8] %>% toupper(),
+					V1 = rep(dod1, 8), V2 = rep(dod1, 8),
+					V3 = rep(dod1, 8), V4 = rep(dod1, 8),
+					V5 = rep(dod1, 8), V6 = rep(dod1, 8),
+					V7 = rep(dod1, 8), V8 = rep(dod1, 8),
+					V9 = rep(dod1, 8), V10 = rep(dod1, 8),
+					V11 = rep(dod1, 8), V12 = rep(dod1, 8))
+		od_table
     })
-    observeEvent(input$reactive_od_table_edit, {
-        #get values
-        info = input$reactive_od_table_edit
+    read_input_ods <- reactive({
+    	req(input$od_csv)
+    	df <- fread(input$od_csv$datapath)
+    	num_rows <- nrow(df)
+    	num_cols <- ncol(df)
+    	if(num_rows != 8){
+    		message(paste0("WARN: Incorrect number of rows identified - ", num_rows, "identified. There should be 8."))
+    	}
+    	if(num_cols != 12){
+    		message(paste0("WARN: Incorrect number of columns identified - ", num_cols, "identified. There should be 12."))
+    	}
+    	df
+    })
+
+    ## ~~ Outputting the target OD tables from different sources
+ 	#choices = list("Homogeneous table" = 2, 
+ 	#"Editable table" = 1, "Upload CSV" = 0), selected = 1, inline = TRUE),
+	#output$input_csv_table <- renderDT({
+	#	req(input$in_od_table_source == 0)
+    #	read_input_ods() %>% datatable(., rownames = FALSE)
+    #})
+	output$reactive_od_table <- renderDT({
+		req(input$in_od_table_source == 1)
+    	datatable(target_od_dat$data, editable = TRUE, rownames= FALSE)
+    })
+	#output$homogeneous_od_table <- renderDT({
+	#	req(input$in_od_table_source == 2)
+    #    set_default_tab() %>% datatable(., rownames = FALSE)
+    #})
+    output$all_od_tabs <- renderDT({
+    	if(input$in_od_table_source == 0){
+	        read_input_ods() %>% datatable(., rownames = FALSE)
+    	} else if(input$in_od_table_source == 2){
+	        set_default_tab() %>% datatable(., rownames = FALSE)
+    	}
+    })
+
+    ## ~~ Reactive OD table elements
+	target_od_dat <- reactiveValues(data = {
+		dat <- data.table( Row = letters[1:8] %>% toupper(),
+			V1 = rep(0.1, 8), V2 = rep(0.1, 8),
+			V3 = rep(0.1, 8), V4 = rep(0.1, 8),
+			V5 = rep(0.1, 8), V6 = rep(0.1, 8),
+			V7 = rep(0.1, 8), V8 = rep(0.1, 8),
+			V9 = rep(0.1, 8), V10 = rep(0.1, 8),
+			V11 = rep(0.1, 8), V12 = rep(0.1, 8))
+		dat
+	})
+    ## Note, if the input table name is n, the input here is n_cell_edit
+    observeEvent(input$reactive_od_table_cell_edit, {
+        ## Getting values
+        info = input$reactive_od_table_cell_edit
         i = as.numeric(info$row)
         j = as.numeric(info$col)
         k = as.numeric(info$value)
 
-        #write values to reactive object
+        ## Writing values to reactive object
         target_od_dat$data[i,j] <- k
     })
+
+    ## ~~ Debugging lines. Was used for reactive table inputs. 
+	debug_table <- reactive({
+		iotv <- in_od_table_val() %>% as.numeric
+		if(iotv == 0){
+			ods <- read_input_ods() %>% as.data.table
+		} else if(iotv == 1){
+			ods <- isolate(target_od_dat$data) %>% as.data.table
+			ods[,"Row"] <- NULL
+		} else if(iotv == 2){
+			ods <- set_default_tab() %>% as.data.table
+			ods[,"Row"] <- NULL
+		}
+		ods[,"row_name" := letters[1:8] %>% toupper()]
+		ods_melted <- melt(ods, id.vars=c("row_name")) 
+		names(ods_melted) <- c("row_name", "col_name", "target_od")
+		ods_melted[,"stock_well" := paste0(gsub(pattern = "V", replacement = "", col_name), row_name)]
+		ods
+	})
+    output$debug_out_tab <- renderDT({ 
+    	debug_table()
+  	})
+    #output$debug_out_print <- renderText({ 
+    #    input$reactive_od_table_cell_edit %>% str %>% print
+    #})
 }
-## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Run the app
 shinyApp(ui = ui, server = server)
