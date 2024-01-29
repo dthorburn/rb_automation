@@ -32,8 +32,14 @@ suppressMessages(library("shiny"))
 suppressMessages(library("DT"))
 
 ## Just for setting the working dir when adjusting things. 
-setwd("C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/od_calculator")
-logo_src <- "https://resurrect.bio/assets/images/logo/colour.png"
+##setwd("C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/od_calculator")
+##logo_src <- "https://resurrect.bio/assets/images/logo/colour.png"
+
+## Setting up the shinylive server
+#setwd("C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation")
+#shinylive::export(appdir = "od_calculator", destdir = "od_calculator_shinylive")
+## Checking it works locally
+#httpuv::runStaticServer("od_calculator_shinylive", port=8008)
 
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~ Define UI
 ui <- fluidPage(
@@ -52,7 +58,7 @@ ui <- fluidPage(
 		    textInput("run_name", "Name of Run:", value = "", placeholder = "N77_AA13"),
 		    textInput("blank_col", "Blank column:", value = "12"),
 		    textInput("target_ul", "Target volume (ul):", value = "1000"),
-		    textInput("drift", "Platereader drift:", value = "4.25"),
+		    textInput("drift", "Platereader drift:", value = "3.95"),
 		    textInput("last_well", "Last well in use:", value = "A11"),
  
     		hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
