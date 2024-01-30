@@ -1,0 +1,8 @@
+dir_path <- "C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/od_calculator"
+setwd(dir_path)
+
+## Testing the app. 
+shiny::runApp()
+
+## To update the app. 
+rsconnect::deployApp(dir_path)

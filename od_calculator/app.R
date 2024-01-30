@@ -2,7 +2,7 @@
 #~				  Resurrect Bio AgroPrep OD Calculator for FeliX automation						  ~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## Author: Doko-Miles Thorburn <dthorburn@imperial.ac.uk>
-## Last Update: 23/01/24
+## Last Update: 30/01/24
 
 ## Loading in required libraries
 if (!require("DT", quietly = TRUE))
@@ -11,25 +11,32 @@ if (!require("shiny", quietly = TRUE))
 	install.packages("shiny")
 if (!require("dplyr", quietly = TRUE))
 	install.packages("dplyr")
-if (!require("httpuv", quietly = TRUE))
-	install.packages("httpuv")
+#if (!require("httpuv", quietly = TRUE))
+#	install.packages("httpuv")
 if (!require("ggplot2", quietly = TRUE))
 	install.packages("ggplot2")
 if (!require("openxlsx", quietly = TRUE))
 	install.packages("openxlsx")
-if (!require("shinylive", quietly = TRUE))
-	install.packages("shinylive")
+#if (!require("rsconnect", quietly = TRUE))
+#	install.packages('rsconnect')
+#if (!require("shinylive", quietly = TRUE))
+#	install.packages("shinylive")
 if (!require("data.table", quietly = TRUE))
 	install.packages("data.table")
 
 suppressMessages(library("data.table"))
-suppressMessages(library("shinylive"))
+#suppressMessages(library("shinylive"))
+#suppressMessages(library("rsconnect"))
 suppressMessages(library("openxlsx"))
 suppressMessages(library("ggplot2"))
-suppressMessages(library("httpuv"))
+#suppressMessages(library("httpuv"))
 suppressMessages(library("dplyr"))
 suppressMessages(library("shiny"))
 suppressMessages(library("DT"))
+
+
+## shinyapps.io through rsconnect
+#rsconnect::deployApp('C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/od_calculator')
 
 ## Just for setting the working dir when adjusting things. 
 ##setwd("C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/od_calculator")
@@ -42,6 +49,7 @@ suppressMessages(library("DT"))
 #httpuv::runStaticServer("od_calculator_shinylive", port=8008)
 
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~ Define UI
+#shinyUI(fluidPage(
 ui <- fluidPage(
 	titlePanel("RB OD Calculator: A tool to calculate aliquot volumes for the FeliX." %>% strong()),
 	sidebarLayout(
@@ -137,8 +145,10 @@ ui <- fluidPage(
 		)
 	)
 )
+#)
 #shinyApp(ui = ui, server = server)
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Define server logic
+#shinyServer(function(input, output) {
 server <- function(input, output) {
 	## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Redundancy around adjustable input values
 	## ~~ Setting up callable reactive variables, might be overkill. 
@@ -419,4 +429,6 @@ server <- function(input, output) {
 	#	input$reactive_od_table_cell_edit %>% str %>% print
 	#})
 }
+#)
 shinyApp(ui = ui, server = server)
+#runApp()
