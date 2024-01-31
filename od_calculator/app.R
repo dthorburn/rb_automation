@@ -259,6 +259,7 @@ server <- function(input, output) {
 		#print(lw_char); print(lw_num)
 		dat[1:lw_num,c("stock_well", "stock_vol", "ai_vol")]
 	})
+
 	## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Fixing erroneous values based on input limit
 	## Making new datatable
 	fix_anoms <- reactive({
@@ -318,7 +319,8 @@ server <- function(input, output) {
 			paste0(run_name(), "_", format(Sys.Date(), "%d%m%Y"), ".txt")
 		},
 		content = function(file) {
-			write.csv(adjust_dat(), file, row.names = FALSE, quote = FALSE)
+			#write.csv(adjust_dat(), file, row.names = FALSE, quote = FALSE)
+			write.csv(fix_anoms(), file, row.names = FALSE, quote = FALSE)
 		}
 	)
 	output$downloadfullData <- downloadHandler(
