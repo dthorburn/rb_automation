@@ -7,13 +7,13 @@ These pipelines and automation protocols were developed to increase throughput o
 CyBio FeliX liquid handing robot protocols are found in subdirectory `felix_protocols`.
 
 Protocols developed and tested:
-	Method 1. Resuspension and washing of agro' colonies.
-	Method 2. Dilution of stock resuspensions and aliquoting to platereader plates. 
-	Method 3. Futher dilution to target OD from 1:5/1:10 dilution plate.
+- Method 1. Resuspension and washing of agro' colonies.
+- Method 2. Dilution of stock resuspensions and aliquoting to platereader plates. 
+- Method 3. Futher dilution to target OD from 1:5/1:10 dilution plate.
 
 Protocols in development:
-	Method 4. All pairwise mixing of agro' colonies carrying antagonist protiens.
-	Method 5. Aliquoting agar and agro' to seedling trays.
+- Method 4. All pairwise mixing of agro' colonies carrying antagonist protiens.
+- Method 5. Aliquoting agar and agro' to seedling trays.
 
 ## OD Calculator
 Source code for UI and Server for the OD calculator app designed for use with the Thermo Multiskan platereader in Scale Space phase C.
