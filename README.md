@@ -7,13 +7,13 @@ These pipelines and automation protocols were developed to increase throughput o
 CyBio FeliX liquid handing robot protocols are found in subdirectory `felix_protocols`.
 
 Protocols developed and tested:
-Method 1. Resuspension and washing of agro' colonies.
-Method 2. Dilution of stock resuspensions and aliquoting to platereader plates. 
-Method 3. Futher dilution to target OD from 1:5/1:10 dilution plate.
+	Method 1. Resuspension and washing of agro' colonies.
+	Method 2. Dilution of stock resuspensions and aliquoting to platereader plates. 
+	Method 3. Futher dilution to target OD from 1:5/1:10 dilution plate.
 
 Protocols in development:
-Method 4. All pairwise mixing of agro' colonies carrying antagonist protiens.
-Method 5. Aliquoting agar and agro' to seedling trays.
+	Method 4. All pairwise mixing of agro' colonies carrying antagonist protiens.
+	Method 5. Aliquoting agar and agro' to seedling trays.
 
 ## OD Calculator
 Source code for UI and Server for the OD calculator app designed for use with the Thermo Multiskan platereader in Scale Space phase C.
@@ -26,3 +26,8 @@ Usage:
 5. Download summary table which is the input for FeliX.
 6. Select new platereader XLSX file following method 3 completion.
 7. Click on Platereader table tab to check accuracy of observed ODs.
+
+## AF2 Colabfold Notebook
+Notebooks copied from the [colabfold](https://github.com/sokrypton/ColabFold) repo. Coped on 01/02/2024 for version 1.5.5.
+
+The notebooks are updated to work with GCP buckets where we store most of our data. These notebooks are suitable for batches of up to 100. Any more, and it becomes viable to use our existing colabfold local solution deployed on private GCP VMs.
