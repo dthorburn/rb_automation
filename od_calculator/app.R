@@ -51,7 +51,7 @@ suppressMessages(library("DT"))
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~ Define UI
 #shinyUI(fluidPage(
 ui <- fluidPage(
-	titlePanel("RB OD Calculator: A tool to calculate aliquot volumes for the FeliX." %>% strong()),
+	titlePanel("RB OD Calculator: A tool to calculate aliquot volumes for the FeliX."),
 	sidebarLayout(
 		sidebarPanel(
 			width = 3,
@@ -67,7 +67,7 @@ ui <- fluidPage(
 			textInput("target_ul", "Target volume (ul):", value = "1000"),
 			textInput("drift", "Platereader drift:", value = "3.95"),
 			textInput("last_well", "Last well in use:", value = "A11"),
-			textInput("min_vol", "Max stock volume to dilute (ul):", value = "650"),
+			textInput("min_vol", "Max stock volume to dilute (ul):", value = "975"),
  
 			hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
 			helpText("To report bugs or request functions to be added, please contact Miles Thorburn <miles@resurrect.bio>")
@@ -94,9 +94,12 @@ ui <- fluidPage(
 				tabPanel("Platereader table",
 					hr(),
 					h3("Input XLSX table from platereader:"),
-					h5("An uneditable version of the platereader plate input file. Mostly for debugging purposes."),
-					h5("If no results are showing, please press Submit again once file path has been selected."),
+					h5("Estimated ODs of platereader data based on current drift level."),
+					DTOutput("fin_od_tab"),
+					hr(),
+					h5("The raw platereader plate input file. Mostly for debugging purposes."),
 					DTOutput("pr_tab")
+
 				),
 
 				tabPanel("Output",
@@ -244,6 +247,23 @@ server <- function(input, output) {
 		dat
 		#ods
 	})
+
+	## ~~ Calculating final OD from platereader -- A lot repeated in above function. Could separate when I have 30 minutes.
+	calc_fin_od <- reactive({
+		dat <- xlsx_in()[!c(9,10),!1] %>% as.data.frame
+		bc <- blank_col() %>% as.numeric
+		b_mean <- dat[,bc] %>% mean
+		dat[,bc] <- NULL
+		no_bs <- dat - b_mean
+
+		## Adjust for drift
+		temp_drift <- drift() %>% as.numeric
+		w_drift <- no_bs * temp_drift
+		w_drift <- w_drift %>% as.data.table
+		w_drift[,"Row" := letters[1:8] %>% toupper()]
+		w_drift[,c(12,1:11)]
+	})
+
 	## ~~ Creating FeliX input table
 	adjust_dat <- reactive({
 		#req(input$calc_go)
@@ -302,15 +322,18 @@ server <- function(input, output) {
 	output$pr_tab <- renderDT({
 		datatable(xlsx_in(), rownames= FALSE)
 	})
+	output$fin_od_tab <- renderDT({
+		datatable(calc_fin_od(), rownames= FALSE) %>% formatRound(c(2:12), 3)
+	})
 	output$out_tab_full <- renderDT({
-		datatable(calc_dat(), rownames= FALSE)
+		datatable(calc_dat(), rownames= FALSE) %>% formatRound(c(4), 3) %>% formatRound(c(6,7), 3)
 	})
 	output$out_tab_summ <- renderDT({
 		#datatable(adjust_dat(), rownames= FALSE)
 		datatable(fix_anoms(), rownames= FALSE, options = list(
 			paging =TRUE,
 			pageLength = 8
-		))
+		)) %>% formatRound(c(2:3), 1)
 	})
 
 	## ~~ Handing download for datasets
