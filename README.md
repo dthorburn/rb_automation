@@ -1,8 +1,7 @@
 ![Alt text](od_calculator/www/rb_logo.png?raw=true "logo")
 
-# Resurrect Bio Automation and Small Batch Scripts Repo
-These pipelines and automation protocols were developed to increase throughput of existing methodologies.
-
+## Resurrect Bio Automation, Small Batch AF2 Notebooks, and Large Batch AF2 Templates
+These pipelines and automation protocols were developed to increase throughput of existing methodologies. There is some overlap with the private `af2mm` repo that has nextflow implementations of colabfold, foldseek, and scoring of AF2 multimer complexes.   
 ## FeliX Automation
 CyBio FeliX liquid handing robot protocols are found in subdirectory `felix_protocols`.
 
@@ -31,4 +30,15 @@ Usage:
 ## AF2 Colabfold Notebook
 Notebooks copied from the [colabfold](https://github.com/sokrypton/ColabFold) repo. Coped on 01/02/2024 for version 1.5.5.
 
-The notebooks are updated to work with GCP buckets where we store most of our data. These notebooks are suitable for batches of up to 100. Any more, and it becomes viable to use our existing colabfold local solution deployed on private GCP VMs.
+The modified notebooks are updated to work with GCP buckets where we store most of our data and found in subdirectory `af2_small_batch`. These notebooks are suitable for batches of up to 100. Any more and it becomes viable to use our existing colabfold local solution deployed on private GCP VMs. There are will be 2 copies of the current small batch notebooks so parallelisation is possible. 
+
+This repo also contains backup script templates for the GCP/AWS colabfold solution in the subdirectory `af2_large_batch_templates`. Instructions to install local colabfold can be found in their own [repo](https://github.com/YoshitakaMo/localcolabfold) with the database setup script found in the original ColabFold [repo](https://github.com/sokrypton/ColabFold).
+
+To use, follow the SOPs instructions on RB's Notion. 
+
+## Resurrect Bio Batch Visualisation of AF2 Monomers and Multimers 
+The scripts found in subdirectory `af2_visualisation` are written to batch process a directory of PDB files emitting a PNG file with the monomer or multimer from several different angles. 
+To use follow these instructions:
+1. Create the conda environment `conda create env --name pymolfree --file pymolfree.yml`
+2. Activate the conda environment `conda activate pymolfree`
+3. Execute bash script `bash pymol_make_figure.sh /path/to/pdb/dir`
