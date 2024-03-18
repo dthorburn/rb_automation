@@ -7,6 +7,12 @@ suppressMessages(library(dplyr))
 
 ## args order should be: nlr fasta, effector fasta, AA length cutoff, and output file name
 args <- commandArgs(trailingOnly = TRUE)
+#args <- ""
+#args[1] <- "~/Resurrect_Bio/Projects/01_Candidate_Search/03_Interactions/09_taestivum_bgaminis/07_ralph_genome_screen/01_fastas/input_nlrs.fasta"
+#args[2] <- "~/Resurrect_Bio/Projects/01_Candidate_Search/03_Interactions/09_taestivum_bgaminis/07_ralph_genome_screen/01_fastas/input_effs.fasta"
+#args[3] <- 2100
+#args[4] <- "batch1_ta_bgt_ralph.fasta"
+
 #print(args)
 nlr_fasta 		<- args[1] %>% as.character
 eff_fasta 		<- args[2] %>% as.character
@@ -25,7 +31,7 @@ if(grepl(pattern = "(\\.fa$)|(\\.faa$)|(\\.fasta$)", output_name)){
 			x = output_name)
 } else {
 	long_out_name <- paste0(output_name, "too_long.fasta")
-	out_name <- paste0(output_name, ".fasta")
+	output_name <- paste0(output_name, ".fasta")
 }
 
 ## Loop to mix sequences - could vectorise, but seems unecessary.
@@ -51,11 +57,11 @@ for(temp_nlr in names(nlrs)){
 		} else if(tot_len < length_cutoff){
 			cor_length <- cor_length + 1
 			if(cor_length == 1){
-				cat(file = paste0("./", out_name), temp_name, append = FALSE)
+				cat(file = paste0("./", output_name), temp_name, append = FALSE)
 			} else {
-				cat(file = paste0("./", out_name), temp_name, append = TRUE)
+				cat(file = paste0("./", output_name), temp_name, append = TRUE)
 			}
-			cat(file = paste0("./", out_name), temp_seq, append = TRUE)
+			cat(file = paste0("./", output_name), temp_seq, append = TRUE)
 		}
 	}
 }
