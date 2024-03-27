@@ -4,6 +4,14 @@
 ## Reminder: Remove conda init from .bashrc
 ## Reminder: Remove conda installation at /opt
 
+## Paramaters
+DOWNLOAD_DBS=0
+
+## Establishing dir paths
+CURRENTPATH=`pwd`
+OFDIR="${CURRENTPATH}/localopenfold"
+
+## Starting Installation
 echo "~~ Installing OpenFold: `date`"
 ## Checking for wget
 type wget 2>/dev/null || { echo "wget is not installed. Please install it using apt or yum." ; exit 1 ; }
@@ -19,19 +27,13 @@ else
   echo "~~ NVIDIA Drivers Fine: `date`"
 fi
 
-## Paramaters
-DOWNLOAD_DBS=0
-
-## Establishing dir paths
-CURRENTPATH=`pwd`
-OFDIR="${CURRENTPATH}/localopenfold"
-
-## Installing git
+## Checking git and installing ninja-build
+sudo apt install ninja-build
 mkdir -p ${OFDIR}
 cd ${OFDIR}
 echo "~~ Setting up Mamba: `date`"
 sudo apt-get update
-type wget 2>/dev/null || { echo "Installing git." ; sudo apt-get install git-all ; }
+type git 2>/dev/null || { echo "Installing git." ; sudo apt-get install git-all ; }
 git version
 
 ## Setting up paths and installing conda/mamba
@@ -56,10 +58,16 @@ bash scripts/install_third_party_dependencies.sh
 
 ## Sanity check - might need to be run when you have a GPU attached. Can you switch GPUs after? 
 echo $LD_LIBRARY_PATH
+export LIBRARY_PATH=$CONDA_PREFIX/lib:$LIBRARY_PATH
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
-## Download weights
+## Download weights and templates
 echo "~~ Downloading Weights: `date`"
-bash scripts/download_openfold_params.sh ${OFDIR}/openfold/resources 
+cd ${OFDIR}
+bash scripts/download_openfold_params.sh openfold/resources 
+bash scripts/download_pdb_mmcif.sh data/
+bash scripts/download_pdb_seqres.sh data/
+
 
 if [ ${DOWNLOAD_DBS} == 0 ]
 then
@@ -73,5 +81,6 @@ then
 		&& bash scripts/prep_mmseqs_dbs.sh data/ \
 		&& echo "~~~~ Unpacked MMSeqs_DBs: `date`"
 fi
+
 
 echo "~~ Finished OpenFold Installation: `date`"
