@@ -4,6 +4,8 @@
 ## Reminder: Remove conda init from .bashrc
 ## Reminder: Remove conda installation at /opt
 
+## NB. You need to go through an manually run blocks of code. There are a few places where you need to restart the shell which kills the script. I could break it down, but it seems unecessary. 
+
 ## Paramaters
 DOWNLOAD_DBS=0
 
@@ -28,13 +30,12 @@ else
 fi
 
 ## Checking git and installing ninja-build
-sudo apt install ninja-build
-mkdir -p ${OFDIR}
-cd ${OFDIR}
-echo "~~ Setting up Mamba: `date`"
-sudo apt-get update
+type ninja 2>/dev/null || { echo "Installing ninja-build." ; sudo apt install ninja-build ; }
 type git 2>/dev/null || { echo "Installing git." ; sudo apt-get install git-all ; }
 git version
+sudo apt-get update
+mkdir -p ${OFDIR}
+cd ${OFDIR}
 
 ## Setting up paths and installing conda/mamba
 echo "~~ Setting up Mamba: `date`"
@@ -47,6 +48,7 @@ export PATH="${OFDIR}/conda/condabin:${PATH}"
 conda update -n base conda -y
 conda init
 conda config --set auto_activate_base false
+bash
 
 ## Setting up OpenFold
 echo "~~ Setting up OpenFold: `date`"
@@ -63,7 +65,7 @@ export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 
 ## Download weights and templates
 echo "~~ Downloading Weights: `date`"
-cd ${OFDIR}
+#cd openfold
 bash scripts/download_openfold_params.sh openfold/resources 
 bash scripts/download_pdb_mmcif.sh data/
 bash scripts/download_pdb_seqres.sh data/
@@ -81,6 +83,5 @@ then
 		&& bash scripts/prep_mmseqs_dbs.sh data/ \
 		&& echo "~~~~ Unpacked MMSeqs_DBs: `date`"
 fi
-
 
 echo "~~ Finished OpenFold Installation: `date`"
