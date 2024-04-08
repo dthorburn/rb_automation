@@ -53,17 +53,17 @@ echo "~~ Starting preditcions: `date`"
 
 cd ${of_dir}
 python3 run_pretrained_openfold.py \
-	${fasta_dir} \
-	\
-    --use_precomputed_alignments ${input} \
-    --jackhmmer_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/jackhmmer \
-    --hhblits_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/hhblits \
-    --hmmsearch_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/hmmsearch \
-    --hmmbuild_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/hmmbuild \
-    --kalign_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/kalign \
-    --config_preset "model_1_multimer_v3" \
-    --model_device "cuda:0" \
-    --output_dir ${output} 
+        ${fasta_dir} \
+        data/pdb_mmcif/mmcif_files/ \
+        --use_precomputed_alignments ${input} \
+        --jackhmmer_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/jackhmmer \
+        --hhblits_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/hhblits \
+        --hmmsearch_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/hmmsearch \
+        --hmmbuild_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/hmmbuild \
+        --kalign_binary_path /home/miles/localopenfold/conda/envs/openfold_env/bin/kalign \
+        --config_preset "model_1_multimer_v3" \
+        --model_device "cuda:0" \
+        --output_dir ${output} 
 
 ## Handling when memory wall reached errors
 if cat ./*.log | grep -q "Killed"

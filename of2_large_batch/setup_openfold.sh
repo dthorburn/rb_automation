@@ -10,8 +10,9 @@
 DOWNLOAD_DBS=0
 
 ## Establishing dir paths
-CURRENTPATH=`pwd`
-OFDIR="${CURRENTPATH}/localopenfold"
+#CURRENTPATH=`pwd`
+#OFDIR="${CURRENTPATH}/localopenfold"
+OFDIR=`pwd`
 
 ## Starting Installation
 echo "~~ Installing OpenFold: `date`"
@@ -34,8 +35,8 @@ type ninja 2>/dev/null || { echo "Installing ninja-build." ; sudo apt install ni
 type git 2>/dev/null || { echo "Installing git." ; sudo apt-get install git-all ; }
 git version
 sudo apt-get update
-mkdir -p ${OFDIR}
-cd ${OFDIR}
+#mkdir -p ${OFDIR}
+#cd ${OFDIR}
 
 ## Setting up paths and installing conda/mamba
 echo "~~ Setting up Mamba: `date`"
@@ -43,11 +44,12 @@ wget -q -P . https://github.com/conda-forge/miniforge/releases/latest/download/M
 bash ./Mambaforge-Linux-x86_64.sh -b -p "${OFDIR}/conda"
 rm Mambaforge-Linux-x86_64.sh
 
+## Make sure this is the installed version, not the one in /opt/conda/condabin
 source "${OFDIR}/conda/etc/profile.d/conda.sh"
 export PATH="${OFDIR}/conda/condabin:${PATH}"
-conda update -n base conda -y
-conda init
-conda config --set auto_activate_base false
+./conda/condabin/conda update -n base conda -y
+./conda/condabin/conda init
+./conda/condabin/conda config --set auto_activate_base false
 bash
 
 ## Setting up OpenFold
@@ -69,7 +71,7 @@ echo "~~ Downloading Weights: `date`"
 bash scripts/download_openfold_params.sh openfold/resources 
 bash scripts/download_pdb_mmcif.sh data/
 bash scripts/download_pdb_seqres.sh data/
-
+python setup.py
 
 if [ ${DOWNLOAD_DBS} == 0 ]
 then
