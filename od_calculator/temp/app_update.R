@@ -63,25 +63,25 @@ ui <- fluidPage(
 			
 			h3("Calculation parameters:"),
 			textInput("run_name", "Name of Run:", value = "", placeholder = "N77_AA13"),
- 			selectInput("in_type", "Infection assay?", choices = c(Yes = "Yes", No = "No"), selected = "Yes"),
-			conditionalPanel(
-				condition = "input.in_type == 'Yes'",
-				selectInput("dilf", "Select Dilution Factor", choices = c("None", "1:5", "1:10", "1:20"), selected = "None"),
-			),
-			conditionalPanel(
-				condition = "input.in_type == 'No'",
-				textInput("last_well", "Last well in use:", value = "A11"),
-			),
-			textInput("target_ul", "Target volume in well or channel (ul):", value = "1000"),
+			textInput("blank_col", "Blank column:", value = "12"),
+			textInput("target_ul", "Target volume (ul):", value = "1000"),
+			textInput("drift", "Platereader drift:", value = "3.95"),
 			textInput("min_vol", "Max stock volume to dilute (ul):", value = "975"),
 			textInput("max_vol", "Max output volume per well or channel (ul):", value = "1000"),
-			textInput("blank_col", "Blank column:", value = "12"),
-			textInput("drift", "Platereader drift:", value = "3.95"),
+ 			selectInput("in_type", "Infection assay?", choices = c(Yes = "Yes", No = "No")),
 			#radioButtons("in_type", h4("Infection assay?"),
 			#			  choices = list("Yes" = 0, "No" = 1), selected = character(0), inline = TRUE),
 			## For the life of me I cannot figure out why this is not working...
-#			textInput("last_well", "Last well in use:", value = "A11"),
-# 			selectInput("dilf", "Select Dilution Factor", choices = c("None", "1:5", "1:10", "1:20"), selected = "None"),
+			textInput("last_well", "Last well in use:", value = "A11"),
+ 			selectInput("dilf", "Select Dilution Factor", choices = c("None", "1:5", "1:10", "1:20"), selected = "None"),
+#			conditionalPanel(
+#				condition = "input.in_type == 'Y'",
+#				textInput("last_well", "Last well in use:", value = "A11"),
+#				conditionalPanel(
+#					condition = "input.in_type == 'N'",
+#					selectInput("dilf", "Select Dilution Factor", choices = c("None", "1:5", "1:10", "1:20"), selected = "None"),
+#				)
+#			),
 
 			hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
 			helpText("To report bugs or request functions to be added, please contact Miles Thorburn <miles@resurrect.bio>")
@@ -116,28 +116,15 @@ ui <- fluidPage(
 
 				),
 
-				tabPanel("Output",
+				tabPanel("Single Effector Output",
 					hr(),
 					h3("Summary Output Table:"),
 					#actionButton("calc_go",label = "Calculate"),
 					#hr(),
 					downloadButton("downloadsumData", "Download FeliX Input Table"),
 					textOutput('warns'),
-					conditionalPanel(
-						condition = "input.in_type == 'Yes'",
-						textOutput('ai_floor_val'),
-						textOutput('stock_floor_val'),
-					),
 					tags$head(
 						tags$style("#warns{color: red;
-							font-size: 20px;
-							font-style: bold;
-						}"),
-						tags$style("#ai_floor_val{color: black;
-							font-size: 20px;
-							font-style: bold;
-						}"),
-						tags$style("#stock_floor_val{color: black;
 							font-size: 20px;
 							font-style: bold;
 						}")
@@ -148,6 +135,32 @@ ui <- fluidPage(
 					hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
 					h3("Full Output Table:"),
 					downloadButton("downloadfullData", "Download Full Output Table"),
+					hr(),
+					DTOutput("out_tab_full")
+				),
+
+				## New panel for infection 
+				tabPanel("Infection Assay Output",
+					hr(),
+					h3("Summary Output Table:"),
+					#actionButton("calc_go",label = "Calculate"),
+					#hr(),
+					downloadButton("downloadsumData", "Download FeliX Input Table"),
+					textOutput('ai_floor_val'),
+					textOutput('stock_floor_val'),
+					textOutput('warns'),
+					tags$head(
+						tags$style("#warns{color: red;
+							font-size: 20px;
+							font-style: bold;
+						}")
+					),
+					#uiOutput("warns"),
+					hr(),
+					DTOutput("out_tab_summInf"),
+					hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
+					h3("Full Output Table:"),
+					downloadButton("downloadfullInfData", "Download Full Output Table"),
 					hr(),
 					DTOutput("out_tab_full")
 				),
@@ -360,7 +373,7 @@ server <- function(input, output) {
 		it <- in_type() %>% as.character
 		if(it == "Yes"){
 			dat_inf <- adjust_dat()
-			ai_floor <- floor((dat_inf$ai_vol/1000)) %>% min
+			ai_floor <- floor((dat$ai_vol/1000)) %>% min
 			if(ai_floor < 0){
 				ai_floor <- 0
 			}
@@ -371,7 +384,7 @@ server <- function(input, output) {
 		it <- in_type() %>% as.character
 		if(it == "Yes"){
 			dat_inf <- adjust_dat()
-			stock_floor <- floor((dat_inf$stock_vol/1000)) %>% min
+			stock_floor <- floor((dat$stock_vol/1000)) %>% min
 			if(stock_floor < 0){
 				stock_floor <- 0
 			}
@@ -422,17 +435,6 @@ server <- function(input, output) {
 		}
 	})
 
-	## Donwload handler couldn't take an if statement. 
-	full_dat <- reactive({
-		it <- in_type() %>% as.character
-		if(it == "Yes"){
-			full_dat <- process_infdat() %>% as.data.table
-		} else if(it == "No"){
-			full_dat <- calc_dat() %>% as.data.table
-		}
-		full_dat
-	})
-
 	## Identifying problems and rendering output
 	anoms_ids <- reactive({
 		fin_dat <- fix_anoms() %>% as.data.table
@@ -458,7 +460,7 @@ server <- function(input, output) {
 		datatable(calc_fin_od(), rownames= FALSE) %>% formatRound(c(2:12), 3)
 	})
 	output$out_tab_full <- renderDT({
-		datatable(full_dat(), rownames= FALSE) %>% formatRound(c(4), 3) %>% formatRound(c(6,7), 3)		
+		datatable(calc_dat(), rownames= FALSE) %>% formatRound(c(4), 3) %>% formatRound(c(6,7), 3)
 	})
 	output$out_tab_summ <- renderDT({
 		#datatable(adjust_dat(), rownames= FALSE)
@@ -467,6 +469,14 @@ server <- function(input, output) {
 			pageLength = 8
 		)) %>% formatRound(c(2:3), 1)
 	})
+	output$out_tab_summInf <- renderDT({
+		#datatable(adjust_dat(), rownames= FALSE)
+		datatable(fix_anoms(), rownames= FALSE, options = list(
+			paging =TRUE,
+			pageLength = 8
+		)) %>% formatRound(c(2:3), 1)
+	})
+
 
 	## ~~ Handing download for datasets
 	output$downloadsumData <- downloadHandler(
@@ -483,7 +493,15 @@ server <- function(input, output) {
 			paste0(run_name(), "_full_table_", format(Sys.Date(), "%d%m%Y"), ".csv")
 		},
 		content = function(file) {
-			write.csv(full_dat(), file, row.names = FALSE, quote = FALSE)
+			write.csv(calc_dat(), file, row.names = FALSE, quote = FALSE)
+		}
+	)
+	output$downloadfullInfData <- downloadHandler(
+		filename = function() {
+			paste0(run_name(), "_full_table_", format(Sys.Date(), "%d%m%Y"), ".csv")
+		},
+		content = function(file) {
+			write.csv(process_infdat(), file, row.names = FALSE, quote = FALSE)
 		}
 	)
 	## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Target OD tables
