@@ -35,7 +35,7 @@ suppressMessages(library("shiny"))
 suppressMessages(library("DT"))
 
 
-## shinyapps.io through rsconnect
+## shinyapps.io through rsconnect -- This is the one for https://dthorburn.shinyapps.io/od_calculator/
 #rsconnect::deployApp('C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/od_calculator')
 
 ## Just for setting the working dir when adjusting things. 
@@ -255,6 +255,12 @@ server <- function(input, output) {
 			w_dilf <- w_drift * 20
 		}
 
+		## adding additional dilution factor for mixing 500ul of nlr and effectors into a single well (which halves the OD of each element) 
+		it <- in_type() %>% as.character
+		if(it == "Yes"){
+			w_dilf <- w_dilf / 2
+		}
+
 		## Manipulating data 
 		w_dilf[,"row_name" := letters[1:8] %>% toupper()]
 		dat_melted <- melt(w_dilf, id.vars=c("row_name")) 
@@ -298,6 +304,7 @@ server <- function(input, output) {
 
 	## ~~ Calculating final OD from platereader -- A lot repeated in above function. Could separate when I have 30 minutes.
 	calc_fin_od <- reactive({
+		it <- in_type() %>% as.character
 		dat <- xlsx_in()[!c(9,10),!1] %>% as.data.frame
 		bc <- blank_col() %>% as.numeric
 		b_mean <- dat[,bc] %>% mean
@@ -458,7 +465,12 @@ server <- function(input, output) {
 		datatable(calc_fin_od(), rownames= FALSE) %>% formatRound(c(2:12), 3)
 	})
 	output$out_tab_full <- renderDT({
-		datatable(full_dat(), rownames= FALSE) %>% formatRound(c(4), 3) %>% formatRound(c(6,7), 3)		
+		it <- in_type() %>% as.character
+		if(it == "Yes"){
+			datatable(full_dat(), rownames= FALSE) %>% formatRound(c(2,3,5,6), 3)		
+		} else {
+			datatable(full_dat(), rownames= FALSE) %>% formatRound(c(4), 3) %>% formatRound(c(6,7), 3)		
+		}
 	})
 	output$out_tab_summ <- renderDT({
 		#datatable(adjust_dat(), rownames= FALSE)
@@ -562,21 +574,21 @@ server <- function(input, output) {
 
 	## ~~ Debugging lines. Was used for reactive table inputs. 
 	debug_table <- reactive({
-		iotv <- in_od_table_val() %>% as.numeric
-		if(iotv == 0){
-			ods <- read_input_ods() %>% as.data.table
-		} else if(iotv == 1){
-			ods <- isolate(target_od_dat$data) %>% as.data.table
-			ods[,"Row"] <- NULL
-		} else if(iotv == 2){
-			ods <- set_default_tab() %>% as.data.table
-			ods[,"Row"] <- NULL
-		}
-		ods[,"row_name" := letters[1:8] %>% toupper()]
-		ods_melted <- melt(ods, id.vars=c("row_name")) 
-		names(ods_melted) <- c("row_name", "col_name", "target_od")
-		ods_melted[,"stock_well" := paste0(gsub(pattern = "V", replacement = "", col_name), row_name)]
-		ods
+#		iotv <- in_od_table_val() %>% as.numeric
+#		if(iotv == 0){
+#			ods <- read_input_ods() %>% as.data.table
+#		} else if(iotv == 1){
+#			ods <- isolate(target_od_dat$data) %>% as.data.table
+#			ods[,"Row"] <- NULL
+#		} else if(iotv == 2){
+#			ods <- set_default_tab() %>% as.data.table
+#			ods[,"Row"] <- NULL
+#		}
+#		ods[,"row_name" := letters[1:8] %>% toupper()]
+#		ods_melted <- melt(ods, id.vars=c("row_name")) 
+#		names(ods_melted) <- c("row_name", "col_name", "target_od")
+#		ods_melted[,"stock_well" := paste0(gsub(pattern = "V", replacement = "", col_name), row_name)]
+#		ods
 	})
 	output$debug_out_tab <- renderDT({ 
 		debug_table()
