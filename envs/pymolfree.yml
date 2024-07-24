@@ -1,8 +1,6 @@
 name: pymolfree
 channels:
   - conda-forge
-  - bioconda
-  - defaults
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
   - _openmp_mutex=4.5=2_gnu
@@ -139,7 +137,6 @@ dependencies:
   - tk=8.6.12=h27826a3_0
   - toml=0.10.2=pyhd8ed1ab_0
   - tomli=2.0.1=pyhd8ed1ab_0
-  - tzdata=2023c=h71feb2d_0
   - wheel=0.40.0=pyhd8ed1ab_0
   - xcb-util=0.4.0=hd590300_1
   - xcb-util-image=0.4.0=h8ee46fc_1
@@ -163,4 +160,11 @@ dependencies:
   - xz=5.2.6=h166bdaf_0
   - zlib=1.2.13=hd590300_5
   - zstd=1.5.2=h3eb15da_6
-prefix: /home/dthorbur/anaconda3/envs/pymolfree
+  - pip:
+      - datatable==1.1.0
+      - pandas==2.2.2
+      - python-dateutil==2.9.0.post0
+      - pytz==2024.1
+      - six==1.16.0
+      - tzdata==2024.1
+prefix: /home/resurrect/conda/envs/pymolfree
