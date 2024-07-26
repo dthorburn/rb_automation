@@ -54,6 +54,7 @@ fi
 rm ${output}/*
 echo "~~ Starting preditcions: `date`"
 colabfold_batch \
+	--disable-unified-memory \
         --num-recycle ${recycles} \
         --num-models ${models} \
         ${input} ${output} &&
