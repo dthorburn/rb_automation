@@ -5,38 +5,54 @@
 ## Adjust zones based on general availability. These have served me well
 gcp_project_id=""
 gcp_service_account=""
-zones=("us-central1-a" "us-west1-b" "us-west4-a" "us-east1-d" "us-east4-a")
+zones=("us-west4-a" "us-east1-d" "us-east4-a" "us-central1-b" "us-west1-b") 
 ## Do not include the "/msas"  or "/predictions" ending of bucket paths. This is automtically added.
-target_bucket="gs://florafold/03-screens/asr_working_nlrs/batch2"
-run_name="asr_wnlrs_b2"
-msas_per_vm=300
-vm_per_zone=16
+target_bucket="gs://florafold/03-screens/asr_new_nlrs"
+run_name="asr_newnlr_b1"
+msas_per_vm=250
+vm_per_zone=20
 
-## Options to override the iteration of VMs from 1 to x
-counter=0
-start_vm_num=1
+## Options to override the iteration of VMs from 1 to x and custom vms per zone to fill out quota.
+custom_vms_per_zone=1 ## boolean use custom vms per zone array
+#vm_array=(11 11 5 5 4)
+vm_array=(10 20 20 20 20)
+start_vm_num=21
+end_vm_num=40
+zone_counter=0
+num_zones=${#zones[@]}
+updated_bucket_path=$(echo "${target_bucket}" | sed -e 's/\//\\\//g')
+updated_run_name=$(echo "${run_name}" | sed -e "s/_/-/g")
 
 ## Splitting MSAs into managable chunks
 ## Or manually do this step if the path is incorrect. 
 gsutil -m cp ${target_bucket}/msas/"*"log ./
 split -l ${msas_per_vm} ./*log
-counter=0
-for i in ./xa*
+
+gsutil -m ls ${target_bucket}/msas/batch"*"/"*"a3m > ${run_name}_files.log
+split -l ${msas_per_vm} ${run_name}_files.log
+end_vm_num=0
+for i in ./x*
 do
     echo $i
-    counter=`expr ${counter} + 1`
-    cat $i | gsutil -m mv -I ${target_bucket}/msas/batch${counter}/
+    end_vm_num=`expr ${end_vm_num} + 1`
+    cat $i | gsutil -m mv -I ${target_bucket}/msas/batch${end_vm_num}/
 done
 
-zone_counter=0
-num_zones=${#zones[@]}
-updated_bucket_path=$(echo "${target_bucket}" | sed -e 's/\//\\\//g')
-
-for i in $(seq ${start_vm_num} ${counter})
+for i in $(seq ${start_vm_num} ${end_vm_num})
 do 
-    ## Sone information 
-    current_zone=${zones[`expr $zone_counter + 1`]} ## This may be a little buggy. 
-    echo "~~~~ Launching L4 VM${i} in zone ${current_zone}: `date`"
+    ## Setting zone information
+    current_zone=${zones[$zone_counter]} ## This may be a little buggy. 
+    if [ $i == $start_vm_num ]
+    then
+        inter_counter=0
+    fi
+    inter_counter=`expr $inter_counter + 1`
+    
+    if [ $custom_vms_per_zone == 1 ]
+    then
+        vm_per_zone=${vm_array[$zone_counter]}
+    fi
+    echo "~~~~ Launching L4 VM${i} (${inter_counter} of ${vm_per_zone}) in zone ${current_zone}: `date`"
 
     # Create the temp_entrypoint.sh script
     echo '#!/bin/bash' > temp_entrypoint.sh
@@ -45,8 +61,8 @@ do
     # sed -i \"28s/1/0/\" /home/miles/run_predictions.sh
     sed -i \"81s/\.\//\/home\/miles\//\" /home/miles/run_predictions.sh
     ## NB, This is the full path in the default file: gs://florafold/03-screens/asr/msas
-    sed -i \"33s//gs:\/\/florafold\/03-screens\/asr/${updated_bucket_path}/\" /home/miles/run_predictions.sh
-    sed -i \"34s//gs:\/\/florafold\/03-screens\/asr/${updated_bucket_path}/\" /home/miles/run_predictions.sh
+    sed -i \"33s/gs:\/\/florafold\/03-screens\/asr/${updated_bucket_path}/\" /home/miles/run_predictions.sh
+    sed -i \"34s/gs:\/\/florafold\/03-screens\/asr/${updated_bucket_path}/\" /home/miles/run_predictions.sh
     sed -i \"37s/batch1/batch${i}/\" /home/miles/run_predictions.sh
     sudo chmod +x /home/miles/run_predictions.sh
 
@@ -74,17 +90,17 @@ do
     " >> temp_entrypoint.sh
     sed -i 's/^[ \t]*//g' temp_entrypoint.sh
 
-    gcloud compute instances create rb-gpucfold-l4-${run_name}-${i} \
+    gcloud compute instances create rb-gpufold-l4-${updated_run_name}-${i} \
         --project=${gcp_project_id} \
         --zone=${current_zone} \
         --machine-type=g2-custom-8-49152 \
         --network-interface=network-tier=PREMIUM,stack-type=IPV4_ONLY,subnet=default \
         --maintenance-policy=TERMINATE \
         --provisioning-model=STANDARD \
-        --service-account=${service-account} \
+        --service-account=${gcp_service_account} \
         --scopes=https://www.googleapis.com/auth/cloud-platform \
         --accelerator=count=1,type=nvidia-l4 \
-        --create-disk=auto-delete=yes,boot=yes,device-name=rb-gpucolabfold-l4-${i},image=projects/${gcp_project_id}/global/images/rb-colabfoldbootdisk-florafold1,mode=rw,size=100,type=projects/${gcp_project_id}/zones/us-west1-c/diskTypes/pd-balanced \
+        --create-disk=auto-delete=yes,boot=yes,device-name=rb-gpufold-l4-${run_name}-${i},image=projects/${gcp_project_id}/global/images/rb-colabfoldbootdisk-florafold1,mode=rw,size=100,type=projects/${gcp_project_id}/zones/us-west1-c/diskTypes/pd-balanced \
         --no-shielded-secure-boot \
         --shielded-vtpm \
         --shielded-integrity-monitoring \
@@ -94,8 +110,9 @@ do
     rm temp_entrypoint.sh ## Just being paranoid
 
     # Increment the zone counter every ${vm_per_zone} iterations
-    if (( i % vm_per_zone == 0 )); then
+    if (( inter_counter % vm_per_zone == 0 )); then
         zone_counter=$(( (zone_counter + 1) % num_zones ))
+        inter_counter=0
     fi
 done
 
@@ -103,8 +120,8 @@ done
                             ##     Handling Uncaught Crashes    ##
                             ######################################
 
-in_bucket="gs://florafold/03-screens/asr_working_nlrs/batch2/msas/batch10"
-out_bucket=`echo ${in_bucket} | sed -e "s/msas/predictions/`
+in_bucket="gs://florafold/03-screens/scn_working_nlrs/msas/batch107"
+out_bucket=`echo ${in_bucket} | sed -e "s/msas/predictions/"`
 
 gsutil -m ls ${out_bucket}/"*"rank_001"*"pdb > temp_file_list
 sed -i "s/predictions/msas/g" temp_file_list
