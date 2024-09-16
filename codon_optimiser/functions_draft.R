@@ -26,7 +26,7 @@ if (!require("data.table", quietly = TRUE))
 if (!require("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 if (!require("Biostrings", quietly = TRUE))
-    install.packages("Biostrings")
+    BiocManager::install("Biostrings")
 
 suppressMessages(library("data.table"))
 suppressMessages(library("Biostrings"))

@@ -7,6 +7,8 @@
 ## shinyapps.io through rsconnect -- This is the one for https://dthorburn.shinyapps.io/codon_optimiser/
 #rsconnect::deployApp('C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/codon_optimiser')
 
+## https://dthorburn.shinyapps.io/codon_optimiser/
+
 ## Loading in required libraries
 if (!require("DT", quietly = TRUE))
   install.packages("DT")
