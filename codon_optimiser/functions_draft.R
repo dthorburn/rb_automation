@@ -15,6 +15,8 @@ if (!require("shiny", quietly = TRUE))
   install.packages("shiny")
 if (!require("dplyr", quietly = TRUE))
   install.packages("dplyr")
+if (!require("seqinr", quietly = TRUE))
+  install.packages("seqinr")
 if (!require("stringr", quietly = TRUE))
   install.packages("stringr")
 if (!require("ggplot2", quietly = TRUE))
@@ -30,6 +32,7 @@ suppressMessages(library("data.table"))
 suppressMessages(library("Biostrings"))
 suppressMessages(library("ggplot2"))
 suppressMessages(library("stringr"))
+#suppressMessages(library("seqinr"))
 suppressMessages(library("dplyr"))
 suppressMessages(library("shiny"))
 suppressMessages(library("DT"))
@@ -39,7 +42,7 @@ suppressMessages(library("DT"))
                                                                     ################################################
 seed           <- 2021
 min_length     <- 300
-input_seq      <- "AQDLARQPNCGQNCLLTAFTTLSNGCTQTDFACLCKSQKFTGTSNLRYSSSCTSTEAATTKSWGAKTCASVGVNVTATLGNTTSVGAGGLVPPLLEQADSDVVNVDEQVEHELAKISDSLQSNGFTSEE"
+#input_seq      <- "AQDLARQPNCGQNCLLTAFTTLSNGCTQTDFACLCKSQKFTGTSNLRYSSSCTSTEAATTKSWGAKTCASVGVNVTATLGNTTSVGAGGLVPPLLEQADSDVVNVDEQVEHELAKISDSLQSNGFTSEE"
 x5_flank       <- "CACTCTGTGGTCTCAA"
 x3_flank       <- "GGTTCGTGAGACCACGAAGTG"
 cut_site_avoid <- "GGTCTC" ## Default: BSAI
@@ -49,6 +52,9 @@ filler_loc     <- "3_prime" ## Where to add filler sequence, 5' or 3'
 remove_X       <- TRUE
 add_M          <- TRUE
 lower_flanks   <- TRUE
+
+#setwd("C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/codon_optimiser/test_data")
+
 ## Maybe implement
 # best_codon vs sampling based on distribution.
 # Checklist to click through to ensure data is processed successfully.
@@ -84,44 +90,19 @@ codon_table <- structure(
                                                                     ################################################
 
 ## Convert stop codons from * to X - Just for ease with donwstream work.
-convert_stops <- function(input_sequence){
-  new_input <- gsub(pattern = "\\*", replacement = "X", input_sequence)
+convert_stops <- function(data_row){
+  new_input <- data.table(seqname = data_row$seqname, 
+                          og_aa_seq = gsub(pattern = "\\*", replacement = "X", data_row$seqs))
   return(new_input)
 }
 
-## Input sequence health check
-check_input_seq <- function(input_sequence, min_len, flank_5, flank_3){
-  warnings <- ""
-  ## Length
-  min_length_wflanks <- min_len - nchar(flank_5) - nchar(flank_3)
-  leftover_length <- (nchar(input_sequence) * 3) - min_length_wflanks
-  if(leftover_length < 0){
-    warnings <- paste0(warnings, "WARN: Input sequence is ", abs(leftover_length), " short of minimum length. Making up length with filler.\n")
-  }
 
-  ## Starting with M
-  starting_aa <- strsplit(input_sequence, split = "")[[1]][1]
-  if(starting_aa != "M"){
-    warnings <- paste0(warnings, "WARN: Input sequence starts with ", starting_aa, ", not M. Please ensure this is correct.\n")
-  }
-
-  ## Internal stops
-  #grepl(pattern = "(X\\*)", "MSXAV")
-  tokenised_seq <- strsplit(input_sequence, split = "")[[1]]
-  if(grepl(pattern = "X", input_sequence)){
-    stops <- which(tokenised_seq == "X")
-    warnings <- paste0(warnings, "WARN: Stop codon identified in input sequence position(s) ", stops, " of ", nchar(input_sequence), ". Please ensure this is correct.\n")
-  }
-  if(warnings != ""){
-    message(warnings)
-  }
-}
 
 ## Function to optimize codon usage based on frequency
-optimise_codon_seq <- function(input_sequence, rand_seed, remove_X, add_M){
+optimise_codon_seq <- function(data_row, rand_seed, remove_X, add_M, codon_table){
   optimised_seq <- ""
   set.seed(rand_seed)
-  tokenised_seq <- strsplit(input_sequence, split = "")[[1]]
+  tokenised_seq <- strsplit(data_row$og_aa_seq, split = "")[[1]]
   if(remove_X == TRUE & tokenised_seq[length(tokenised_seq)] == "X"){
     tokenised_seq <- tokenised_seq[1:(length(tokenised_seq) - 1)]
   }
@@ -134,24 +115,27 @@ optimise_codon_seq <- function(input_sequence, rand_seed, remove_X, add_M){
     #best_codon <- aa_codons[which.max(aa_codons$Frequency), "Codon"]
     optimised_seq <- paste0(optimised_seq, codon_out)
   }
-  return(optimised_seq)
+  output <- data.table(seqname = data_row$seqname, opt_dna_seqs = optimised_seq, og_aa_seq = data_row$og_aa_seq) 
+  return(output)
 }
 
-## Function that checks if site to avoid is present in intial optimised sequence. If so, it increments seed by 1 and tries again. If after `cut_iterations` no solution without restriction site is found, it fails, but still emits the sequence. 
-restriction_site_check <- function(input_sequence, rand_seed, stop_counter, cut_site_avoid){
-  contains_site <- grepl(pattern = cut_site_avoid, input_sequence)
+## Function that checks if site to avoid is present in intial optimised sequence. If so, it increments seed by 1 and tries again. 
+## If after `cut_iterations` no solution without restriction site is found, it fails, but still emits the sequence. 
+#data_row <- seq2[2,]
+restriction_site_check <- function(data_row, seed, cut_iterations, cut_site_avoid, remove_X, add_M){
+  contains_site <- grepl(pattern = cut_site_avoid, data_row$opt_dna_seqs, ignore.case = TRUE)
   if(contains_site == FALSE){
-    return(input_sequence)
+    return(data_row)
   } else if(contains_site == TRUE){
     counter  <- 0
     while(contains_site == TRUE){
       counter   <- counter + 1
-      temp_seed <- rand_seed + 1
-      temp_seq  <- optimise_codon_seq(input_sequence, rand_seed)
-      contains_site <- grepl(pattern = cut_site_avoid, temp_seq)
-      if(counter == stop_counter){
+      temp_seed <- seed + 1
+      temp_seq  <- optimise_codon_seq(data_row[,c(1,3)], temp_seed, remove_X, add_M, codon_table)
+      contains_site <- grepl(pattern = cut_site_avoid, temp_seq$opt_dna_seqs)
+      if(counter == cut_iterations){
         break
-        warnings <- paste0("ERROR: Completed ", counter , " iterations of random codon optimisation. Cannot remove cut site ", cut_site_avoid, "\nIncrease iterations or change seed and try again. If problem persists, manually inspect.")
+        warn_messages <- paste0("ERROR: Completed ", counter , " iterations of random codon optimisation in ", data_row$seqname, ". Cannot remove cut site ", cut_site_avoid, "\nIncrease iterations or change seed and try again. If problem persists, manually inspect.")
         ## If this becomes an issue, add debug details with coordinates and output all iterations to log file.  
       }
     }
@@ -160,7 +144,8 @@ restriction_site_check <- function(input_sequence, rand_seed, stop_counter, cut_
 }
 
 ## Function to add flanks and add filler if needed. Filler will be lowercase just to easily identify. 
-add_flanks <- function(input_sequence, x5_flank, x3_flank, filler_seq, min_length, filler_loc, lower_flanks){
+data_row <- seq3[9,]
+add_flanks <- function(data_row, x5_flank, x3_flank, filler_seq, min_length, filler_loc, lower_flanks){
   if(lower_flanks == TRUE){
     x5_flank <- tolower(x5_flank)
     x3_flank <- tolower(x3_flank)
@@ -168,7 +153,7 @@ add_flanks <- function(input_sequence, x5_flank, x3_flank, filler_seq, min_lengt
     x5_flank <- toupper(x5_flank)
     x3_flank <- toupper(x3_flank)    
   }
-  with_flanks <- paste0(x5_flank, input_sequence, x3_flank)
+  with_flanks <- paste0(x5_flank, data_row$opt_dna_seqs, x3_flank)
 
   ## Second length check and filler addition if required.
   len_diff <- nchar(with_flanks) - as.numeric(min_length)
@@ -182,52 +167,164 @@ add_flanks <- function(input_sequence, x5_flank, x3_flank, filler_seq, min_lengt
   } else {
     out_seq <- with_flanks
   }
-  return(out_seq)
+  output <- data.table(seqname = data_row$seqname, opt_dna_seqs_wflanks = out_seq, 
+                      opt_dna_seqs = data_row$opt_dna_seqs, og_aa_seq = data_row$og_aa_seq)
+  return(output)
 }
+data_row <- seq4[5,]
+#output_check <- function(data_row, seq_w_flanks_dt, original_seq_dt, cut_site_avoid){
+sanity_check <- function(data_row, cut_site_avoid, min_length, x5_flank, x3_flank){
+  #warn_messages <- ""
 
-output_check <- function(input_sequence, cut_site_avoid){
-  warnings <- ""
+  ## Length
+  min_length_wflanks <- min_length - nchar(x5_flank) - nchar(x3_flank)
+  leftover_length <- (nchar(data_row$og_aa_seq) * 3) - min_length_wflanks
+  data_row[,"DNA_length" := nchar(data_row$opt_dna_seqs_wflanks)]
+  if(leftover_length < 0){
+    data_row[,"DNA_filler" := abs(leftover_length)]
+    data_row[,"filler_warn" := 1]
+    #warn_messages <- paste0(warn_messages, "WARN: ", data_row$seqname, " is ", abs(leftover_length), " short of minimum length. Making up length with filler.\n")
+  } else {
+    data_row[,"DNA_filler" := 0]
+    data_row[,"filler_warn" := 0]
+  }
+
+  ## Starting with M 
+  starting_aa <- strsplit(data_row$og_aa_seq, split = "")[[1]][1]
+  if(starting_aa != "M"){
+    data_row[,"start_m_warn" := 1]
+    #warn_messages <- paste0(warn_messages, "WARN: ", data_row$seqname, " starts with ", starting_aa, ", not M. Please ensure this is correct.\n")
+  } else {
+    data_row[,"start_m_warn" := 0]
+  }
+
+  ## Overlap with second check. Moved relevant aspects. 
+  #tokenised_seq <- strsplit(data_row$og_aa_seq, split = "")[[1]]
+  #if(grepl(pattern = "X", data_row$og_aa_seq)){
+  #  stops <- which(tokenised_seq == "X")
+  #  data_row[,"internal_x_warn" := 1]
+  #  #warn_messages <- paste0(warn_messages, "WARN: Stop codon identified in ", data_row$seqname, " position(s) ", paste(stops, collapse = " + "), " of ", nchar(data_row$seqs), ". Please ensure this is correct.\n")
+  #} else {
+  #  data_row[,"internal_x_warn" := 0]
+  #}
 
   ## Second rescriction site check
-  num_restrictions <- str_count(pattern = cut_site_avoid, input_sequence)
+  #seq_w_flanks <- seq_w_flanks_dt[which(data_row$seqname == seq_w_flanks_dt$seqname), 2]
+  num_restrictions <- str_count(pattern = toupper(cut_site_avoid), toupper(data_row$opt_dna_seqs_wflanks))
+  data_row[,"num_restriction_sites" := num_restrictions]
   if(num_restrictions > 1){
-    warnings <- paste0(warnings, "ERROR: ", num_restrictions, " sites to avoid detected with sequence ", cut_site_avoid, "\n")
+    data_row[,"restriction_sites_warn" := 1]
+    #warn_messages <- paste0(warn_messages, "ERROR: ", num_restrictions, " sites to avoid detected with sequence ", cut_site_avoid, ". There should be 1.\n")
+  } else if(num_restrictions == 0){
+    data_row[,"restriction_sites_warn" := 1]
+    #warn_messages <- paste0(warn_messages, "ERROR: ", num_restrictions, " sites to avoid detected with sequence ", cut_site_avoid, ". There should be 1.\n")
+  } else {
+    data_row[,"restriction_sites_warn" := 0]
   }
 
   ## Internal stop codon check
-  translated <- DNAString(input_sequence) %>% translate
-  num_int_stops <- str_count(pattern = "X", as.character(translated))
+  translated <- DNAString(data_row$opt_dna_seqs) %>% Biostrings::translate(.) %>% as.character %>% gsub(pattern = "\\*", replacement = "X", .)
+  tokenised_seq <- strsplit(translated, split = "")[[1]]
+  num_int_stops <- str_count(pattern = "X", translated)
   if(num_int_stops > 0){
-    warnings <- paste0(warnings, "ERROR: ", num_int_stops, " stop codons detected with sequence.\n")
+    data_row[,"internal_x_warn" := 1]
+    stops <- which(tokenised_seq == "X")
+    data_row[,"internal_x_positions" := paste(stops, collapse = ", ")]
+    #warn_messages <- paste0(warn_messages, "ERROR: ", num_int_stops, " stop codons detected in ", data_row$seqname,".\n")
+  } else {
+    data_row[,"internal_x_warn" := 0]
+    data_row[,"internal_x_positions" := 0]
   }
 
   ## Sanity check against input
-  match_input <- grepl(pattern = translated, input_sequence)
+  #og_seq <- original_seq_dt[which(data_row$seqname == original_seq_dt$seqname), 2]
+  match_input <- grepl(pattern = translated, data_row$og_aa_seq, ignore.case = TRUE)
   if(match_input == FALSE){
     ## Removing start and end to see if pattern can be found since these can be added/removed during optimisation. If not, a problem might be present.
-     match_attempt2 <- grepl(pattern = str_sub(translated, start = 2, end = -2), input_sequence)
-     if(match_attempt2 == FALSE){
-      warnings <- paste0(warnings, "ERROR: Input sequence and translated optimised sequence do not match.")
-     }
+    match_attempt2 <- grepl(pattern = str_sub(translated, start = 2, end = -2), data_row$og_aa_seq)
+    if(match_attempt2 == FALSE){
+      data_row[,"sequence_match_warn" := 1]
+      #warn_messages <- paste0(warn_messages, "ERROR: Input ", data_row$seqname," sequence and translated optimised sequence do not match.\n")
+    } else {
+      data_row[,"sequence_match_warn" := 0]
+    }
+  } else {
+    data_row[,"sequence_match_warn" := 0]
   }
 
-  if(warnings != ""){
-    message(warnings)
-  }
+  return(data_row)
 }
-
-
-
 
 
 ## Testing funcitons - works well enough.
 # Main functionality
 seq1 <- convert_stops(input_seq) 
-check_input_seq(seq1, min_length, x5_flank, x3_flank)
+#check_input_seq(seq1, min_length, x5_flank, x3_flank)
 seq2 <- optimise_codon_seq(seq1, seed, remove_X, add_M)
 seq3 <- restriction_site_check(seq2, seed, cut_iterations, cut_site_avoid)
 seq4 <- add_flanks(seq3, x5_flank, x3_flank, filler_seq, min_length, filler_loc, lower_flanks)
-output_check(seq4, cut_site_avoid)
+output_check(seq3, seq4, seq1, cut_site_avoid)
+
+
+
+## Updating to batch process fastas
+fas <- seqinr::read.fasta(file = "effectors.fasta", as.string = TRUE, forceDNAtolower = FALSE)
+fas_dt <- data.table(seqname = names(fas), seqs = fas %>% unlist %>% as.data.table)
+names(fas_dt)[2] <- "seqs" ## This is odd behaviour. 
+
+seq1 <- convert_stops(fas_dt) 
+#check_input_seq(seq1[1,], min_length, x5_flank, x3_flank)
+#optimise_codon_seq(seq1[2,], seed, remove_X, add_M, codon_table)[,2] %>% as.character %>% DNAString(.) %>% Biostrings::translate(.)
+
+for(i in 1:nrow(seq1)){
+  temp_out <- optimise_codon_seq(seq1[eval(i),], seed, remove_X, add_M, codon_table)
+  if(i == 1){
+    seq2 <- temp_out
+  } else {
+    seq2 <- rbind(seq2, temp_out)
+  }
+}
+
+restriction_site_check(seq2[2,], seed, cut_iterations, cut_site_avoid, remove_X, add_M)
+for(i in 1:nrow(seq2)){
+  temp_out <- restriction_site_check(seq2[eval(i),], seed, cut_iterations, cut_site_avoid, remove_X, add_M)
+  if(i == 1){
+    seq3 <- temp_out
+  } else {
+    seq3 <- rbind(seq3, temp_out)
+  }
+}
+
+for(i in 1:nrow(seq3)){
+  temp_out <- add_flanks(seq3[eval(i),], x5_flank, x3_flank, filler_seq, min_length, filler_loc, lower_flanks)
+  if(i == 1){
+    seq4 <- temp_out
+  } else {
+    seq4 <- rbind(seq4, temp_out)
+  }
+}
+
+
+for(i in 1:nrow(seq4)){
+  temp_out <- sanity_check(seq4[eval(i),], cut_site_avoid, min_length, x5_flank, x3_flank)
+  if(i == 1){
+    seq5 <- temp_out
+  } else {
+    seq5 <- rbind(seq5, temp_out)
+  }
+}
+
+## Melting relevant columns of seq5
+to_plot <- melt(seq5[,c(1, 7, 8, 10, 11, 13)], id.vars = c("seqname"))
+
+ggplot(to_plot, aes(y = seqname, x = variable, fill = value)) +
+  geom_tile(color = "black") +
+  labs(x = "Warnings", y = "Input Sequence Name") +
+  scale_fill_gradient(low = "#09b81b", high = "#cf0a0a") +
+  theme_classic(base_size = 20) +
+  scale_x_discrete(labels = c("Length Filler", "Input 5' M", "Sites to Avoid", "Internal Stops", "Input :: Output\nSequence Match"), expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  theme(legend.position = "None")
 
 
 
@@ -245,3 +342,4 @@ for(i in seq(1,1000,1)){
 } 
 output$codon %>% table/1000 %>% sort
 aa_codons
+
