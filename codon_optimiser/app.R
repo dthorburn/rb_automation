@@ -5,7 +5,7 @@
 ## 
 
 ## shinyapps.io through rsconnect -- This is the one for https://dthorburn.shinyapps.io/codon_optimiser/
-#rsconnect::deployApp('C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/codon_optimiser')
+# rsconnect::deployApp('C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/codon_optimiser')
 
 ## https://dthorburn.shinyapps.io/codon_optimiser/
 
@@ -86,7 +86,8 @@ optimise_codon_seq <- function(data_row, rand_seed, remove_X, add_M, codon_table
 ## Function that checks if site to avoid is present in intial optimised sequence. If so, it increments seed by 1 and tries again. 
 ## If after `cut_iterations` no solution without restriction site is found, it fails, but still emits the sequence. 
 restriction_site_check <- function(data_row, seed, cut_iterations, cut_site_avoid, remove_X, add_M){
-  contains_site <- grepl(pattern = cut_site_avoid, data_row$opt_dna_seqs, ignore.case = TRUE)
+  revcomp_cut_site <- cut_site_avoid %>% DNAString %>% reverseComplement %>% as.character
+  contains_site <- grepl(pattern = paste(cut_site_avoid, revcomp_cut_site, sep = "|"), data_row$opt_dna_seqs, ignore.case = TRUE)
   if(contains_site == FALSE){
     return(data_row)
   } else if(contains_site == TRUE){
@@ -95,16 +96,17 @@ restriction_site_check <- function(data_row, seed, cut_iterations, cut_site_avoi
       counter   <- counter + 1
       temp_seed <- seed + 1
       temp_seq  <- optimise_codon_seq(data_row[,c(1,3)], temp_seed, remove_X, add_M, codon_table)
-      contains_site <- grepl(pattern = cut_site_avoid, temp_seq$opt_dna_seqs)
+      contains_site <- grepl(pattern = paste(cut_site_avoid, revcomp_cut_site, sep = "|"), temp_seq$opt_dna_seqs, ignore.case = TRUE)
       if(counter == cut_iterations){
         break
-        warn_messages <- paste0("ERROR: Completed ", counter , " iterations of random codon optimisation in ", data_row$seqname, ". Cannot remove cut site ", cut_site_avoid, "\nIncrease iterations or change seed and try again. If problem persists, manually inspect.")
+        #warn_messages <- paste0("ERROR: Completed ", counter , " iterations of random codon optimisation in ", data_row$seqname, ". Cannot remove cut site ", cut_site_avoid, "\nIncrease iterations or change seed and try again. If problem persists, manually inspect.")
         ## If this becomes an issue, add debug details with coordinates and output all iterations to log file.  
       }
     }
     return(temp_seq)
   }
 }
+
 
 ## Function to add flanks and add filler if needed. Filler will be lowercase just to easily identify. 
 add_flanks <- function(data_row, x5_flank, x3_flank, filler_seq, min_length, filler_loc, lower_flanks){
@@ -156,14 +158,22 @@ sanity_check <- function(data_row, cut_site_avoid, min_length, x5_flank, x3_flan
   }
 
   ## Second rescriction site check
-  num_restrictions <- str_count(pattern = toupper(cut_site_avoid), toupper(data_row$opt_dna_seqs_wflanks))
+  revcomp_cut_site <- cut_site_avoid %>% DNAString %>% reverseComplement %>% as.character
+  num_restrictions <- str_count(pattern = toupper(cut_site_avoid), toupper(data_row$opt_dna_seqs_wflanks)) +
+  										str_count(pattern = toupper(revcomp_cut_site), toupper(data_row$opt_dna_seqs_wflanks))
   data_row[,"num_restriction_sites" := num_restrictions]
-  if(num_restrictions > 1){
-    data_row[,"restriction_sites_warn" := 1]
-  } else if(num_restrictions == 0){
-    data_row[,"restriction_sites_warn" := 1]
+  if(trimws(x5_flank) == "" & trimws(x3_flank) == ""){
+  	if(num_restrictions == 0){
+    	data_row[,"restriction_sites_warn" := 0]
+  	} else if(num_restrictions > 0){
+    	data_row[,"restriction_sites_warn" := 2]
+  	}
   } else {
-    data_row[,"restriction_sites_warn" := 0]
+  	if(num_restrictions == 2){
+    	data_row[,"restriction_sites_warn" := 0]
+  	} else {
+    	data_row[,"restriction_sites_warn" := 2]
+  	}
   }
 
   ## Internal stop codon check
@@ -171,7 +181,7 @@ sanity_check <- function(data_row, cut_site_avoid, min_length, x5_flank, x3_flan
   tokenised_seq <- strsplit(translated, split = "")[[1]]
   num_int_stops <- str_count(pattern = "X", translated)
   if(num_int_stops > 0){
-    data_row[,"internal_x_warn" := 1]
+    data_row[,"internal_x_warn" := 2]
     stops <- which(tokenised_seq == "X")
     data_row[,"internal_x_positions" := paste(stops, collapse = "+")]
   } else {
@@ -184,7 +194,7 @@ sanity_check <- function(data_row, cut_site_avoid, min_length, x5_flank, x3_flan
   if(match_input == FALSE){
     match_attempt2 <- grepl(pattern = str_sub(translated, start = 2, end = -2), data_row$og_aa_seq)
     if(match_attempt2 == FALSE){
-      data_row[,"sequence_match_warn" := 1]
+      data_row[,"sequence_match_warn" := 2]
     } else {
       data_row[,"sequence_match_warn" := 0]
     }
@@ -348,10 +358,17 @@ server <- function(input, output) {
 
 		## Melting relevant columns of seq5
 		to_plot <- melt(seq5[,c(1, 7, 8, 10, 11, 13)], id.vars = c("seqname"))
+		if(max(to_plot$value) == 1){
+		  colours <- c("#09b81b", "#e39d10")
+		} else if(max(to_plot$value) == 0){
+		  colours <- c("#09b81b", "#09b81b")
+		} else if(max(to_plot$value) == 2){
+		  colours <- c("#09b81b", "#cf0a0a")
+}
 		ggplot(to_plot, aes(y = seqname, x = variable, fill = value)) +
 		  geom_tile(color = "black") +
 		  labs(x = "Warnings", y = "Input Sequence Name") +
-		  scale_fill_gradient(low = "#09b81b", high = "#cf0a0a") +
+		  scale_fill_gradient(low = colours[1], high = colours[2]) +
 		  theme_classic(base_size = 20) +
 		  scale_x_discrete(labels = c("Length Filler", "Input 5' M", "Sites to Avoid", "Internal Stops", "Input :: Output\nSequence Match"), expand = c(0,0)) +
 		  scale_y_discrete(limits = rev(unique(to_plot$seqname)), expand = c(0,0)) +
@@ -374,7 +391,7 @@ server <- function(input, output) {
 	output$input_seq_table <- renderDT({
 		fas_dt <- sequence_in()
 		seq1 <- convert_stops(fas_dt)
-		seq1[,"dna_length" := nchar(og_aa_seq)]
+		seq1[,"aa_length" := nchar(og_aa_seq)]
 		datatable(seq1[,c(1,3,2)])
 	})
 
