@@ -1,0 +1,10 @@
+name: codon_optimiser
+title:
+username: dthorburn
+account: dthorburn
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12720906
+bundleId: 9139143
+url: https://dthorburn.shinyapps.io/codon_optimiser/
+version: 1
