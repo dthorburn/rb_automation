@@ -9,7 +9,7 @@ run_name="asr_wnlrs_b2"
 security_key_name=rb-gpufold-l4-1
 msas_per_vm=300
 vm_per_zone=20
-counter=0
+counter=1
 start_vm_num=1
 
                             ######################################
@@ -53,7 +53,7 @@ do
     sed -i \"89s/\*log/\/home\/ec2-user\/\*log/\" /root/run_predictions.sh
     sed -i \"66s|./\*.log|/home/ec2-user/\*.log|;94s|./\*.log|/home/ec2-user/\*.log|;106s|./\*.log|/home/ec2-user/\*.log|\" /root/run_predictions.sh    
     sudo chmod +x /root/run_predictions.sh
-    sudo chmod 777 /root/
+    sudo chmod -R 777 /root/
     
     # Create a systemd service to run the script after boot
     echo \"[Unit]
