@@ -5,19 +5,20 @@
 ## Adjust zones based on general availability. These have served me well
 gcp_project_id=""
 gcp_service_account=""
-zones=("us-west4-a" "us-east1-d" "us-east4-a" "us-central1-b" "us-west1-b") 
+zones=("us-east4-a" "us-central1-b" "us-west1-b" "us-central1-a" "us-west4-a" "us-east1-d" ) 
+zones=("us-central1-a" "us-west4-a" "us-east4-a") 
 ## Do not include the "/msas"  or "/predictions" ending of bucket paths. This is automtically added.
-target_bucket="gs://florafold/03-screens/asr_new_nlrs"
-run_name="asr_newnlr_b1"
+target_bucket="gs://florafold/03-screens/psojae-rxlr-all-ccnlrs"
+run_name="psojae_rxlr_gmax_ccnlrs"
 msas_per_vm=250
-vm_per_zone=20
+vm_per_zone=30
 
 ## Options to override the iteration of VMs from 1 to x and custom vms per zone to fill out quota.
 custom_vms_per_zone=1 ## boolean use custom vms per zone array
 #vm_array=(11 11 5 5 4)
-vm_array=(10 20 20 20 20)
-start_vm_num=21
-end_vm_num=40
+vm_array=(9 22 26)
+start_vm_num=119
+end_vm_num=135
 zone_counter=0
 num_zones=${#zones[@]}
 updated_bucket_path=$(echo "${target_bucket}" | sed -e 's/\//\\\//g')
@@ -28,7 +29,8 @@ updated_run_name=$(echo "${run_name}" | sed -e "s/_/-/g")
 gsutil -m cp ${target_bucket}/msas/"*"log ./
 split -l ${msas_per_vm} ./*log
 
-gsutil -m ls ${target_bucket}/msas/batch"*"/"*"a3m > ${run_name}_files.log
+#gsutil -m ls ${target_bucket}/msas/batch"*"/"*"a3m > ${run_name}_files.log
+gsutil -m ls ${target_bucket}/"*"a3m > ${run_name}_files.log
 split -l ${msas_per_vm} ${run_name}_files.log
 end_vm_num=0
 for i in ./x*

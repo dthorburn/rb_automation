@@ -59,7 +59,7 @@ codon_table <- structure(
 ## Convert stop codons from * to X - Just for ease with donwstream work.
 convert_stops <- function(data_row){
   new_input <- data.table(seqname = data_row$seqname, 
-                          og_aa_seq = gsub(pattern = "\\*", replacement = "X", data_row$seqs))
+                          og_aa_seq = gsub(pattern = "\\*", replacement = "X", toupper(data_row$seqs)))
   return(new_input)
 }
 
@@ -76,7 +76,19 @@ optimise_codon_seq <- function(data_row, rand_seed, remove_X, add_M, codon_table
   }
   for(temp_aa in tokenised_seq){
     aa_codons <- subset(codon_table, aa == temp_aa)
+    # Check if there are codons for the amino acid
+    if (nrow(aa_codons) == 0) {
+      stop(paste("Error: No codons found for amino acid", temp_aa))
+    }
+    
+    # Check if there is a valid frequency for sampling
+    if (any(aa_codons$frequency > 0)) {
+      codon_out <- sample(aa_codons$codon, size = 1, replace = FALSE, prob = aa_codons$frequency)
+    } else {
+      stop(paste("Error: Invalid frequency for amino acid", temp_aa))
+    }
     codon_out <- sample(aa_codons$codon, size = 1, replace = FALSE, prob = aa_codons$frequency)
+    #best_codon <- aa_codons[which.max(aa_codons$Frequency), "Codon"]
     optimised_seq <- paste0(optimised_seq, codon_out)
   }
   output <- data.table(seqname = data_row$seqname, opt_dna_seqs = optimised_seq, og_aa_seq = data_row$og_aa_seq) 
