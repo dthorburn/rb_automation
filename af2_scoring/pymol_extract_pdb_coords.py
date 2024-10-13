@@ -15,40 +15,8 @@ import glob
 ## Initialize pymol - '-c' for no GUI, '-q' for quiet mode
 pymol.finish_launching(['pymol', '-cq'])
 
-## FIrst attempt. Way too long to process. 
-#    ## Iterate through each atom in the model and compare distances
-#    for i, atom1 in enumerate(all_residues.atom):
-#        for j, atom2 in enumerate(all_residues.atom):
-#            if i < j:  # Avoid redundant pair checks
-#                distance = cmd.get_distance(f"index {atom1.index}", f"index {atom2.index}")
-#                
-#                # Check if the distance is within the specified range
-#                if 0 < distance <= distance_threshold:
-#                    interactions.append({
-#                        "complex": sname,
-#                        "residue1": f"{atom1.resn}{atom1.resi}",
-#                        "chain1": atom1.chain,
-#                        "atom1": atom1.name,
-#                        "residue1_num": atom1.resi,  # Add residue1 number
-#                        "residue2": f"{atom2.resn}{atom2.resi}",
-#                        "chain2": atom2.chain,
-#                        "atom2": atom2.name,
-#                        "residue2_num": atom2.resi,  # Add residue2 number
-#                        "distance": distance
-#                    })
-
 ## Define functions
 def find_complex_interactions(pdb_file, distance_threshold=5.0):
-    """
-    Load a PDB file in PyMOL and find all interactions (within 0-x Å) between amino acids.
-    
-    Args:
-        pdb_file (str): Path to the PDB file.
-        distance_threshold (float): Distance cutoff for interaction (in angstroms).
-    
-    Returns:
-        pd.DataFrame: DF with interacting residue pairs and their distances.
-    """
     cmd.load(pdb_file, "alphafold_complex")
     
     ## Getting file names for output
