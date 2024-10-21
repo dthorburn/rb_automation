@@ -3,7 +3,6 @@ import numpy as np
 import os
 import re
 import argparse
-import glob
 
 ## Initial solution will ONLY count interactions with NBD, LRR, and between those to handle unannotated WHD domains. 
 def sum_domain_interations(seq, coords, domains, whd_width = 100):
@@ -33,7 +32,7 @@ def sum_domain_interations(seq, coords, domains, whd_width = 100):
 		"seqname": seq,
 		"gene_id": temp_coords.gene_id.values[0],
 		"effector": temp_coords.effector.values[0],
-		"complex": temp_coords.complex.values[0],
+		#"complex": temp_coords.complex.values[0],
 		"domains": temp_domains.Domain.values[0],
 		"overlapping_nbd_lrr": overlapping_nbd_lrr,
 		"pre_nbd_contacts": temp_coords['residue1_num'][temp_coords['residue1_num'] < nbd_start].count(),
