@@ -1,8 +1,8 @@
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~				  Resurrect Bio AgroPrep OD Calculator for FeliX automation						  ~
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-## Author: Doko-Miles Thorburn <dthorburn@imperial.ac.uk>
-## Last Update: 30/01/24
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~				  Resurrect Bio Cell Culture AgroPrep OD Calculator for FeliX automation              ~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+## Author: Doko-Miles Thorburn <miles@resurrect.bio>
+## Last Update: 20/11/24
 
 ## Loading in required libraries
 if (!require("DT", quietly = TRUE))
@@ -25,17 +25,14 @@ suppressMessages(library("dplyr"))
 suppressMessages(library("shiny"))
 suppressMessages(library("DT"))
 
-
 ## shinyapps.io through rsconnect -- This is the one for https://dthorburn.shinyapps.io/cell_od_calculator/
 #rsconnect::deployApp('C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/cell_od_calculator')
-
-## Just for setting the working dir when adjusting things. 
-##setwd("C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/od_calculator")
+## For debugging 
+##setwd("C:/Users/miles/Documents/Resurrect_Bio/Scripts/rb_automation/cell_od_calculator")
 
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~ Define UI
-#shinyUI(fluidPage(
 ui <- fluidPage(
-	titlePanel("RB OD Calculator: A tool to calculate aliquot volumes for the FeliX."),
+	titlePanel("RB Cell Culture OD Calculator: A tool to calculate aliquot volumes for the FeliX."),
 	sidebarLayout(
 		sidebarPanel(
 			width = 3,
@@ -44,21 +41,22 @@ ui <- fluidPage(
 			
 			h3("Optional input data:"),
 			fileInput("od_csv", "Target OD CSV upload", multiple = FALSE),
-			
+			radioButtons("in_od_table_source", "Source of target OD table:",
+				choices = list("Homogeneous table" = 1, "Upload CSV" = 0), selected = 1, inline = TRUE),
+
 			h3("Calculation parameters:"),
 			textInput("run_name", "Name of Run:", value = "", placeholder = "psojae_batch1"),
- 			selectInput("num_out_plates", "Number of output plates?", choices = c(1 = "1", 2 = "2", 3 = "3"), selected = "1"),
- 			selectInput("to_platereader", "Output to platereader?", choices = c(Yes = "Yes", No = "No"), selected = "Yes"),
+ 			selectInput("num_out_plates", "Number of output plates?", choices = c("1" = "1", "2" = "2", "3" = "3", "4" = "4", "5" = "5"), selected = "1"),
+ 			selectInput("to_platereader", "Add volume for output platereader test?", choices = c("Yes" = "Yes", "No" = "No"), selected = "Yes"),
 			textInput("last_well", "Last well in use:", value = "A12"),
 			textInput("target_ul", "Target volume per replicate (ul):", value = "200"),
 			textInput("min_vol", "Minimum volume of stock to dilute (ul):", value = "25"),
-			textInput("blank_mean", "Blank mean:", value = "12"),
+			textInput("blank_mean", "Blank mean:", value = "0.04"),
 			textInput("drift", "Platereader drift:", value = "3.95"),
 			textInput("max_vol", "Max output volume per well or channel (ul):", value = "1000"),
-			radioButtons("in_od_table_source", h4("Source of target OD table:"),
-				  choices = list("Homogeneous table" = 1, "Upload CSV" = 0), selected = 1, inline = TRUE),
-			radioButtons("default_od", h4("Default target OD for homogeneous table:"),
-				  choices = list("0.05" = "0.05", "0.1" = "0.1", "0.2" = "0.2", "0.3" = "0.3"), selected = "0.1", inline = TRUE),
+ 			selectInput("remove_control_wells", "Remove +/- control wells from calculation?", choices = c("Yes" = "Yes", "No" = "No"), selected = "Yes"),
+			radioButtons("default_od", "Default target OD for homogeneous table:",
+				choices = list("0.05" = "0.05", "0.1" = "0.1", "0.2" = "0.2", "0.3" = "0.3"), selected = "0.1", inline = TRUE),
 
 			hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
 			helpText("To report bugs or request functions to be added, please contact Miles Thorburn <miles@resurrect.bio>")
@@ -71,6 +69,11 @@ ui <- fluidPage(
 					h3("Target OD table:"),
 					h5("Note: Ignore values in unused wells."),
 					textOutput('num_plate_output'),
+					tags$head(
+						tags$style("#num_plate_output{color: red;
+							font-size: 20px;
+						}")
+					),
 					hr(),
 					DTOutput("all_od_tabs"),
 				),
@@ -91,26 +94,12 @@ ui <- fluidPage(
 					h3("Summary Output Table:"),
 					downloadButton("downloadsumData", "Download FeliX Input Table"),
 					textOutput('warns'),
-					conditionalPanel(
-						condition = "input.in_type == 'Yes'",
-						textOutput('ai_floor_val'),
-						textOutput('stock_floor_val'),
-					),
 					tags$head(
 						tags$style("#warns{color: red;
 							font-size: 20px;
 							font-style: bold;
 						}"),
-						tags$style("#ai_floor_val{color: black;
-							font-size: 20px;
-							font-style: bold;
-						}"),
-						tags$style("#stock_floor_val{color: black;
-							font-size: 20px;
-							font-style: bold;
-						}")
 					),
-					#uiOutput("warns"),
 					hr(),
 					DTOutput("out_tab_summ"),
 					hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
@@ -143,37 +132,38 @@ ui <- fluidPage(
 		)
 	)
 )
+
 #shinyApp(ui = ui, server = server)
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Define server logic
 server <- function(input, output) {
 	## ~~ Setting up callable reactive variables, in same order as selection above. 
-	run_name         <- reactive({ trimws(input$run_name) })
+	run_name         <- reactive({ as.character(trimws(input$run_name)) })
 	num_out_plates   <- reactive({ as.numeric(input$num_out_plates) })
 	to_platereader   <- reactive({ as.character(input$to_platereader) })
-	last_well        <- reactive({ trimws(input$last_well) })
-	target_ul        <- reactive({ trimws(input$target_ul) })
-	min_vol          <- reactive({ as.numeric(input$min_vol) })
+	last_well        <- reactive({ as.character(trimws(input$last_well)) })
+	target_ul        <- reactive({ as.numeric(trimws(input$target_ul)) })
+	min_vol          <- reactive({ as.numeric(trimws(input$min_vol)) })
 	blank_mean       <- reactive({ as.numeric(input$blank_mean) })
-	drift            <- reactive({ trimws(input$drift) })
-	max_vol          <- reactive({ as.numeric(input$max_vol) })
+	drift            <- reactive({ as.numeric(trimws(input$drift)) })
+	max_vol          <- reactive({ as.numeric(trimws(input$max_vol)) })
 	dod              <- reactive({ as.numeric(input$default_od) })
+	rcw              <- reactive({ as.character(input$remove_control_wells) })
 	in_od_table_val  <- reactive({ as.numeric(input$in_od_table_source) })
 
 	## ~~ Step 1: Error Checking for number of output plates
 	total_volume <- reactive({
-		num_plates <- num_out_plates() %>% as.numeric
-		output_vol <- num_plates * target_ul()
+		output_vol <- num_out_plates() * target_ul()
 		if(to_platereader() == "Yes"){
 			output_vol <- output_vol + 200
 		}
-		output_vol
+		as.numeric(output_vol)
 	})
 	output$num_plate_output <- renderText({
-		plate_vol <- total_volume() %>% as.data.table
-		if(plate_vol$output_vol > as.numeric(max_vol())){
-			paste0("WARN! Total volumes per well outside of acceptable range: ", plate_vol$output_vol)
+		if(total_volume() > max_vol()){
+			paste0("WARN! Total volumes per well outside of acceptable range: ", total_volume(), "ul. Reduce number of output plates (including platereader plate).")
 		} else {
-			paste0("Total Output volume per well acceptable: ", errs_out$stock_well)
+			paste0("")
+			#paste0("Total Output volume per well acceptable: ", total_volume())
 		}
 	})
 
@@ -266,13 +256,12 @@ server <- function(input, output) {
 		setorderv(dat, c("col_name", "row_name"), c(1, -1))
 
 		## Calculating the volumes
-		temp_target_vol <- total_volume() %>% as.numeric
 		calc_stock <- function(row_num){
-			temp_val <- (dat$target_od[row_num] / dat$diluted_plate_od_dc[row_num]) * temp_target_vol
+			temp_val <- (as.numeric(dat$target_od[row_num]) / as.numeric(dat$diluted_plate_od_dc[row_num])) * total_volume()
 			round(temp_val, digits = 1) %>% return
 		}
 		dat[,"stock_vol" := calc_stock(1:nrow(dat))]
-		dat[,"ai_vol" := temp_target_vol - stock_vol %>% round(., digits = 1)]
+		dat[,"ai_vol" := total_volume() - stock_vol %>% round(., digits = 1)]
 		dat
 	})
 	output$out_tab_full <- renderDT({
@@ -303,48 +292,17 @@ server <- function(input, output) {
 		dat[1:lw_num,c("stock_well", "stock_vol", "ai_vol")]		
 	})
 
-	## ~~ Step 7: Making a text output for the floor volumes to add to the FeliX parameters
-	ai_floor_proc <- reactive({
-		it <- in_type() %>% as.character
-		if(it == "Yes"){
-			dat_inf <- adjust_dat()
-			ai_floor <- floor((dat_inf$ai_vol/1000)) %>% min
-			if(ai_floor < 0){
-				ai_floor <- 0
-			}
-			ai_floor
-		}
-	})
-	stock_floor_proc <- reactive({
-		it <- in_type() %>% as.character
-		if(it == "Yes"){
-			dat_inf <- adjust_dat()
-			stock_floor <- floor((dat_inf$stock_vol/1000)) %>% min
-			if(stock_floor < 0){
-				stock_floor <- 0
-			}
-			stock_floor
-		}
-	})
-	output$ai_floor_val <- renderText({
-		ai_floor_out <- ai_floor_proc() %>% as.character
-		paste0("AI Floor Volume (ml): ", ai_floor_out)
-	})
-	output$stock_floor_val <- renderText({
-		stock_floor_out <- stock_floor_proc() %>% as.character
-		paste0("Stock Floor Volume (ml): ", stock_floor_out)
-	})
-
-	## ~~ Step 8: Adjusting wells with out of range values and reporting.
+	## ~~ Step 7: Adjusting wells with out of range values and reporting.
 	fix_anoms <- reactive({
-		dat <- adjust_dat() %>% as.data.table
-		min_vol_num <- min_vol() %>% as.numeric
-		max_vol_num <- max_vol() %>% as.numeric
+		dat <- adjust_dat()
 		adjust_vols <- function(row_num){
 			temp_row <- dat[row_num,]
 			## Adjusting if values higher than limits
-			temp_row[,"stock_vol" := ifelse((stock_vol > min_vol_num), 20, stock_vol)]
-			temp_row[,"ai_vol" := ifelse((ai_vol > max_vol_num), 20, ai_vol)]
+			temp_row[,"stock_vol" := ifelse((stock_vol > total_volume()), 20, stock_vol)]
+			temp_row[,"ai_vol" := ifelse((ai_vol > total_volume()), 20, ai_vol)]
+			## Adjusting if values higher than limits
+			temp_row[,"stock_vol" := ifelse((stock_vol < min_vol()), 20, stock_vol)]
+			temp_row[,"ai_vol" := ifelse((ai_vol > max_vol()), 20, ai_vol)]
 			## Adjusting if values are negative
 			temp_row[,"stock_vol" := ifelse((stock_vol < 0), 20, stock_vol)]
 			temp_row[,"ai_vol" := ifelse((ai_vol < 0), 20, ai_vol)]
@@ -357,6 +315,10 @@ server <- function(input, output) {
 			return(temp_row)
 		}
 		out <- lapply(FUN = adjust_vols, 1:nrow(dat)) %>% rbindlist
+		if(rcw() == "Yes"){
+			target_wells <- c("4G", "4H", "8G", "8H", "12G", "12H")
+			out[stock_well %in% target_wells, `:=`(stock_vol = 0, ai_vol = 0)] ## Can this be NULL instead? Does FeliX skip these?
+		}
 		out
 	})
 	anoms_ids <- reactive({
