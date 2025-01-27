@@ -278,7 +278,7 @@ server <- function(input, output) {
 	output$fin_od_tab <- renderDT({
 		w_drift <- drift_cor()
 		w_drift[,"Row" := letters[1:8] %>% toupper()]
-		datatable(w_drift[,c(12,1:11)], rownames= FALSE) %>% formatRound(c(2:12), 3)
+		datatable(w_drift[,c(1:12)], rownames= FALSE) %>% formatRound(c(2:12), 3)
 	})
 
 	## ~~ Step 6: Creating FeliX input table by adjusting values based on last 
