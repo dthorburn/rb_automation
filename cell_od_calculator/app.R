@@ -45,18 +45,19 @@ ui <- fluidPage(
 				choices = list("Homogeneous table" = 1, "Upload CSV" = 0), selected = 1, inline = TRUE),
 
 			h3("Calculation parameters:"),
-			textInput("run_name", "Name of Run:", value = "", placeholder = "psojae_batch1"),
- 			selectInput("num_out_plates", "Number of output plates?", choices = c("1" = "1", "2" = "2", "3" = "3", "4" = "4", "5" = "5"), selected = "1"),
+			textInput("run_name", "Name of Run:", value = "", placeholder = "Orange"),
+ 			selectInput("num_out_plates", "Number of output plates?", choices = c("1" = "1", "2" = "2", "3" = "3", "4" = "4", "5" = "5", "6" = "6", "7" = "7"), selected = "1"),
  			selectInput("to_platereader", "Add volume for output platereader test?", choices = c("Yes" = "Yes", "No" = "No"), selected = "Yes"),
 			textInput("last_well", "Last well in use:", value = "A12"),
 			textInput("target_ul", "Target volume per replicate (ul):", value = "200"),
 			textInput("min_vol", "Minimum volume of stock to dilute (ul):", value = "25"),
 			textInput("blank_mean", "Blank mean:", value = "0.04"),
 			textInput("drift", "Platereader drift:", value = "3.95"),
-			textInput("max_vol", "Max output volume per well or channel (ul):", value = "1000"),
- 			selectInput("remove_control_wells", "Remove +/- control wells from calculation?", choices = c("Yes" = "Yes", "No" = "No"), selected = "Yes"),
+			textInput("max_vol", "Max output volume per well or channel (ul):", value = "1400"),
+ 			selectInput("remove_control_wells", "Remove +/- control wells from calculation?", choices = c("Yes" = "Yes", "No" = "No"), selected = "No"),
+ 			selectInput("beckman_repeat", "Effector plate number?", choices = c("1" = "1", "2" = "2", "3" = "3", "4" = "4"), selected = "1"),
 			radioButtons("default_od", "Default target OD for homogeneous table:",
-				choices = list("0.05" = "0.05", "0.1" = "0.1", "0.2" = "0.2", "0.3" = "0.3"), selected = "0.1", inline = TRUE),
+				choices = list("0.05" = "0.05", "0.1" = "0.1", "0.2" = "0.2", "0.3" = "0.3", "0.4" = "0.4"), selected = "0.4", inline = TRUE),
 
 			hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
 			helpText("To report bugs or request functions to be added, please contact Miles Thorburn <miles@resurrect.bio>")
@@ -91,8 +92,6 @@ ui <- fluidPage(
 
 				tabPanel("Output",
 					hr(),
-					h3("Summary Output Table:"),
-					downloadButton("downloadsumData", "Download FeliX Input Table"),
 					textOutput('warns'),
 					tags$head(
 						tags$style("#warns{color: red;
@@ -101,8 +100,19 @@ ui <- fluidPage(
 						}"),
 					),
 					hr(),
-					DTOutput("out_tab_summ"),
+					h3("Beckman BioMek Input Table:"),
+					h5("WARNING: Please remember to add a run name and change the \"Effector plate number\" option in the parameter section on the left."),
+					downloadButton("downloadsumData_beckman_stock", "Download Beckman Input Stock Table"),
+					downloadButton("downloadsumData_beckman_ai", "Download Beckman Input AI Table"),
+					hr(),
+					DTOutput("out_tab_summ_beckman_stock"),
+					hr(),
+					DTOutput("out_tab_summ_beckman_ai"),
 					hr(style="border-color: #b2b2b3; margin-bottom: 0px"),
+					h3("CyBio FeliX Input Table:"),
+					downloadButton("downloadsumData", "Download FeliX Input Table"),
+					hr(),
+					DTOutput("out_tab_summ"),
 					h3("Full Output Table:"),
 					downloadButton("downloadfullData", "Download Full Output Table"),
 					hr(),
@@ -140,6 +150,7 @@ server <- function(input, output) {
 	run_name         <- reactive({ as.character(trimws(input$run_name)) })
 	num_out_plates   <- reactive({ as.numeric(input$num_out_plates) })
 	to_platereader   <- reactive({ as.character(input$to_platereader) })
+	beckman_repeat   <- reactive({ as.numeric(input$beckman_repeat) })
 	last_well        <- reactive({ as.character(trimws(input$last_well)) })
 	target_ul        <- reactive({ as.numeric(trimws(input$target_ul)) })
 	min_vol          <- reactive({ as.numeric(trimws(input$min_vol)) })
@@ -149,6 +160,7 @@ server <- function(input, output) {
 	dod              <- reactive({ as.numeric(input$default_od) })
 	rcw              <- reactive({ as.character(input$remove_control_wells) })
 	in_od_table_val  <- reactive({ as.numeric(input$in_od_table_source) })
+
 
 	## ~~ Step 1: Error Checking for number of output plates
 	total_volume <- reactive({
@@ -278,10 +290,10 @@ server <- function(input, output) {
 	output$fin_od_tab <- renderDT({
 		w_drift <- drift_cor()
 		w_drift[,"Row" := letters[1:8] %>% toupper()]
-		datatable(w_drift[,c(1:12)], rownames= FALSE) %>% formatRound(c(2:12), 3)
+		datatable(w_drift[,c(1:12)], rownames= FALSE) %>% formatRound(c(1:12), 3)
 	})
 
-	## ~~ Step 6: Creating FeliX input table by adjusting values based on last 
+	## ~~ Step 6: Creating FeliX input table by adjusting values based on last well in use
 	adjust_dat <- reactive({
 		dat <- calc_dat() %>% as.data.table
 		lw <- last_well() %>% as.character
@@ -298,19 +310,19 @@ server <- function(input, output) {
 		adjust_vols <- function(row_num){
 			temp_row <- dat[row_num,]
 			## Adjusting if values higher than limits
-			temp_row[,"stock_vol" := ifelse((stock_vol > total_volume()), 20, stock_vol)]
-			temp_row[,"ai_vol" := ifelse((ai_vol > total_volume()), 20, ai_vol)]
+			temp_row[,"stock_vol" := ifelse((stock_vol > total_volume()), 0, stock_vol)]
+			temp_row[,"ai_vol" := ifelse((ai_vol > total_volume()), 0, ai_vol)]
 			## Adjusting if values higher than limits
-			temp_row[,"stock_vol" := ifelse((stock_vol < min_vol()), 20, stock_vol)]
-			temp_row[,"ai_vol" := ifelse((ai_vol > max_vol()), 20, ai_vol)]
+			temp_row[,"stock_vol" := ifelse((stock_vol < min_vol()), 0, stock_vol)]
+			temp_row[,"ai_vol" := ifelse((ai_vol > max_vol()), 0, ai_vol)]
 			## Adjusting if values are negative
-			temp_row[,"stock_vol" := ifelse((stock_vol < 0), 20, stock_vol)]
-			temp_row[,"ai_vol" := ifelse((ai_vol < 0), 20, ai_vol)]
+			temp_row[,"stock_vol" := ifelse((stock_vol < 0), 0, stock_vol)]
+			temp_row[,"ai_vol" := ifelse((ai_vol < 0), 0, ai_vol)]
 			# Adjusting second volume if first was changed
-			if(temp_row$stock_vol == 20){
-				temp_row[,"ai_vol" := 20]
-			} else if(temp_row$ai_vol == 20){
-				temp_row[,"stock_vol" := 20]
+			if(temp_row$stock_vol == 0){
+				temp_row[,"ai_vol" := 0]
+			} else if(temp_row$ai_vol == 0){
+				temp_row[,"stock_vol" := 0]
 			}
 			return(temp_row)
 		}
@@ -321,20 +333,55 @@ server <- function(input, output) {
 		}
 		out
 	})
+	## ~~ Step 8: Adjusting output for Beckman
+	beckman_stock_calc <- reactive({
+		dat <- fix_anoms() %>% as.data.table
+		br_num <- beckman_repeat()
+		dat[, "col" := gsub(stock_well, pattern = "^([0-9][0-9]?)([A-H])", replacement = "\\1") %>% as.numeric]
+		dat[, "row" := gsub(stock_well, pattern = "^([0-9][0-9]?)([A-H])", replacement = "\\2")]
+		setorderv(dat, c("col", "row"), c(1,1))
+		beckman_stock_out <- data.table(
+			"Source" = paste0("source1.", br_num),
+			"Source well" = dat$stock_well,
+			"Destination" = paste0("destination1.", br_num),
+			"Destination well" = dat$stock_well,
+			"volume" = dat$stock_vol %>% round(.,0))
+		beckman_stock_out
+	})
+
+	beckman_ai_calc <- reactive({
+		dat <- fix_anoms() %>% as.data.table
+		br_num <- beckman_repeat()
+		dat[, "col" := gsub(stock_well, pattern = "^([0-9][0-9]?)([A-H])", replacement = "\\1") %>% as.numeric]
+		dat[, "row" := gsub(stock_well, pattern = "^([0-9][0-9]?)([A-H])", replacement = "\\2")]
+		setorderv(dat, c("col", "row"), c(1,1))
+		beckman_ai_out <- data.table(
+			"Source" = ifelse(br_num < 3, "source2", "source3"),
+			"Source well" = 1,
+			"Destination" = paste0("destination1.", br_num),
+			"Destination well" = dat$stock_well,
+			"volume" = dat$ai_vol %>% round(.,0))
+		beckman_ai_out
+	})
+
+	## ~~ Step 9: Creating error message
 	anoms_ids <- reactive({
 		fin_dat <- fix_anoms() %>% as.data.table
-		errs <- subset(fin_dat, stock_vol == 20 & ai_vol == 20)
+		errs <- subset(fin_dat, stock_vol == 0 & ai_vol == 0)
 		errs
 	})
 	output$warns <- renderText({
 		errs_out <- anoms_ids() %>% as.data.table
 		paste0("WARN! Volumes outside of acceptable range for wells: ", paste(errs_out$stock_well, collapse = " "))
 	})
+
+	## ~~ Step 10: Robot input data emitting
+	## FeliX
 	output$out_tab_summ <- renderDT({
 		datatable(fix_anoms(), rownames= FALSE, options = list(
 			paging =TRUE,
 			pageLength = 8
-		)) %>% formatRound(c(2:3), 1)
+		)) %>% formatRound(c(2:3), 0)
 	})
 	output$downloadsumData <- downloadHandler(
 		filename = function() {
@@ -342,6 +389,38 @@ server <- function(input, output) {
 		},
 		content = function(file) {
 			write.csv(fix_anoms(), file, row.names = FALSE, quote = FALSE)
+		}
+	)
+	## Beckman
+	output$out_tab_summ_beckman_stock <- renderDT({
+		datatable(beckman_stock_calc(), rownames= FALSE, options = list(
+			paging =TRUE,
+			pageLength = 8
+		)) %>% formatRound(5, 0)
+	})
+	output$out_tab_summ_beckman_ai <- renderDT({
+		datatable(beckman_ai_calc(), rownames= FALSE, options = list(
+			paging =TRUE,
+			pageLength = 8
+		)) %>% formatRound(5, 0)
+	})
+
+	output$downloadsumData_beckman_stock <- downloadHandler(
+		filename = function() {
+			br_num <- beckman_repeat()
+			paste0(run_name(), "_source1.", br_num, "_stock_", format(Sys.Date(), "%d%m%Y"), ".csv")
+		},
+		content = function(file) {
+			write.csv(beckman_stock_calc(), file, row.names = FALSE, quote = FALSE)
+		}
+	)
+	output$downloadsumData_beckman_ai <- downloadHandler(
+		filename = function() {
+			br_num <- beckman_repeat()
+			paste0(run_name(), "_source1.", br_num, "_ai_", format(Sys.Date(), "%d%m%Y"), ".csv")
+		},
+		content = function(file) {
+			write.csv(beckman_stock_calc(), file, row.names = FALSE, quote = FALSE)
 		}
 	)
 }
