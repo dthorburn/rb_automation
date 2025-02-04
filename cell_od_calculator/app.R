@@ -2,7 +2,7 @@
 #~				  Resurrect Bio Cell Culture AgroPrep OD Calculator for FeliX automation              ~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## Author: Doko-Miles Thorburn <miles@resurrect.bio>
-## Last Update: 20/11/24
+## Last Update: 04/02/25
 
 ## Loading in required libraries
 if (!require("DT", quietly = TRUE))
@@ -32,7 +32,7 @@ suppressMessages(library("DT"))
 
 ## ~~~~~~~~~~~~~~~~~~~~~~~~~~ Define UI
 ui <- fluidPage(
-	titlePanel("RB Cell Culture OD Calculator: A tool to calculate aliquot volumes for the FeliX."),
+	titlePanel("RB Cell Pack OD Calculator: A tool to calculate aliquot volumes for the FeliX and BioMek."),
 	sidebarLayout(
 		sidebarPanel(
 			width = 3,
@@ -101,7 +101,7 @@ ui <- fluidPage(
 					),
 					hr(),
 					h3("Beckman BioMek Input Table:"),
-					h5("WARNING: Please remember to add a run name and change the \"Effector plate number\" option in the parameter section on the left."),
+					h4("WARNING: Please remember to add a run name and change the \"Effector plate number\" option in the parameter section on the left."),
 					downloadButton("downloadsumData_beckman_stock", "Download Beckman Input Stock Table"),
 					downloadButton("downloadsumData_beckman_ai", "Download Beckman Input AI Table"),
 					hr(),
@@ -339,12 +339,14 @@ server <- function(input, output) {
 		br_num <- beckman_repeat()
 		dat[, "col" := gsub(stock_well, pattern = "^([0-9][0-9]?)([A-H])", replacement = "\\1") %>% as.numeric]
 		dat[, "row" := gsub(stock_well, pattern = "^([0-9][0-9]?)([A-H])", replacement = "\\2")]
+		dat[, "format_well" := paste0(row, col)]
+
 		setorderv(dat, c("col", "row"), c(1,1))
 		beckman_stock_out <- data.table(
 			"Source" = paste0("source1.", br_num),
-			"Source well" = dat$stock_well,
+			"Source well" = dat$format_well,
 			"Destination" = paste0("destination1.", br_num),
-			"Destination well" = dat$stock_well,
+			"Destination well" = dat$format_well,
 			"volume" = dat$stock_vol %>% round(.,0))
 		beckman_stock_out
 	})
@@ -354,12 +356,14 @@ server <- function(input, output) {
 		br_num <- beckman_repeat()
 		dat[, "col" := gsub(stock_well, pattern = "^([0-9][0-9]?)([A-H])", replacement = "\\1") %>% as.numeric]
 		dat[, "row" := gsub(stock_well, pattern = "^([0-9][0-9]?)([A-H])", replacement = "\\2")]
+		dat[, "format_well" := paste0(row, col)]
+		
 		setorderv(dat, c("col", "row"), c(1,1))
 		beckman_ai_out <- data.table(
 			"Source" = ifelse(br_num < 3, "source2", "source3"),
 			"Source well" = 1,
 			"Destination" = paste0("destination1.", br_num),
-			"Destination well" = dat$stock_well,
+			"Destination well" = dat$format_well,
 			"volume" = dat$ai_vol %>% round(.,0))
 		beckman_ai_out
 	})
@@ -420,7 +424,7 @@ server <- function(input, output) {
 			paste0(run_name(), "_source1.", br_num, "_ai_", format(Sys.Date(), "%d%m%Y"), ".csv")
 		},
 		content = function(file) {
-			write.csv(beckman_stock_calc(), file, row.names = FALSE, quote = FALSE)
+			write.csv(beckman_ai_calc(), file, row.names = FALSE, quote = FALSE)
 		}
 	)
 }
