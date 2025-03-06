@@ -1,8 +1,8 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~				  Resurrect Bio Cell Culture Ouptut Plotting              ~
+#~				      Resurrect Bio Cell Culture Ouptut Plotting                ~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## Author: Doko-Miles Thorburn <miles@resurrect.bio>
-## Last Update: 27/01/25
+## Last Update: 04/02/25
 
 ## Loading libraries
 options(repos = c(CRAN = "https://cran.ma.imperial.ac.uk/"))

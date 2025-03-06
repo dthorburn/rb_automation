@@ -2,7 +2,7 @@
 #~				  Resurrect Bio Cell Culture AgroPrep OD Calculator for FeliX automation              ~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## Author: Doko-Miles Thorburn <miles@resurrect.bio>
-## Last Update: 04/02/25
+## Last Update: 12/02/25
 
 ## Loading in required libraries
 if (!require("DT", quietly = TRUE))
@@ -53,6 +53,7 @@ ui <- fluidPage(
 			textInput("min_vol", "Minimum volume of stock to dilute (ul):", value = "25"),
 			textInput("blank_mean", "Blank mean:", value = "0.04"),
 			textInput("drift", "Platereader drift:", value = "3.95"),
+			textInput("extra_vol", "Additional dead volume to add (ul):", value = "0"),
 			textInput("max_vol", "Max output volume per well or channel (ul):", value = "1400"),
  			selectInput("remove_control_wells", "Remove +/- control wells from calculation?", choices = c("Yes" = "Yes", "No" = "No"), selected = "No"),
  			selectInput("beckman_repeat", "Effector plate number?", choices = c("1" = "1", "2" = "2", "3" = "3", "4" = "4"), selected = "1"),
@@ -156,6 +157,7 @@ server <- function(input, output) {
 	min_vol          <- reactive({ as.numeric(trimws(input$min_vol)) })
 	blank_mean       <- reactive({ as.numeric(input$blank_mean) })
 	drift            <- reactive({ as.numeric(trimws(input$drift)) })
+	extra_vol        <- reactive({ as.numeric(trimws(input$extra_vol)) })
 	max_vol          <- reactive({ as.numeric(trimws(input$max_vol)) })
 	dod              <- reactive({ as.numeric(input$default_od) })
 	rcw              <- reactive({ as.character(input$remove_control_wells) })
@@ -165,6 +167,7 @@ server <- function(input, output) {
 	## ~~ Step 1: Error Checking for number of output plates
 	total_volume <- reactive({
 		output_vol <- num_out_plates() * target_ul()
+		output_vol <- output_vol + extra_vol()
 		if(to_platereader() == "Yes"){
 			output_vol <- output_vol + 200
 		}
