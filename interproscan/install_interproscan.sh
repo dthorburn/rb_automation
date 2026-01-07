@@ -1,9 +1,9 @@
+#!/bin/bash
 IPR_DIR=/mnt/sda1/interproscan
 
 export PATH=/home/resurrect/conda/envs/iprscan/bin:$PATH
 
 cd $IPR_DIR
-
 
 if [ ! -f IPR_READY ]
 then
