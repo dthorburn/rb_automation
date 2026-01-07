@@ -4,7 +4,7 @@
 
 aws_instance_type=g6.2xlarge
 ami_id=ami-06e8a163482ac06a1
-target_bucket=s3://rb-florafold/05_screening/toy_data
+target_bucket=s3://rb-florafold/05_screening/gmax-asr/new-screen0925/
 run_name="asr_wnlrs_b2"
 security_key_name=rb-gpufold-l4-1
 msas_per_vm=300
@@ -27,7 +27,7 @@ do
 done
 
 zone_counter=0
-aws_zones=("us-east-1d" "us-east-2c" "us-west-2a")
+aws_zones=("us-west-2a" "us-east-1d" "us-east-2c" )
 num_zones=${#aws_zones[@]}
 updated_bucket_path=$(echo "${target_bucket}" | sed -e 's/\//\\\//g')
 
