@@ -1,4 +1,4 @@
-## Use the pymolfree conda env for this. 
+## Use the af2_ss conda env for this. It's running python 3.10 and it clearly outdated, but this script needs rewriting otherwise.  
 import os
 import glob
 import argparse
@@ -11,10 +11,10 @@ from MDAnalysis.analysis import distances
 ## Functions
 def ss3_ss8_conv(ss8_seq):
     ss_map = {
-        'H':'H', 'G': 'H', 'I': 'H',
+        'H': 'H', 'G': 'H', 'I': 'H',
         'E': 'E', 'B': 'E', 
-        'T': 'C', 'S': 'C', 'C': 'C', 'L': 'C',
-        '-':'-'
+        'T': 'C', 'S': 'C', 'C': 'C', 'L': 'C', 'P': 'C', 
+        '-': '-'
     }
     ## For each ss8 in ss8_seq, it applies the ss_map conversion. - Getting more used to this logic.
     ss3_seq = ''.join([ss_map[ss8] for ss8 in ss8_seq])

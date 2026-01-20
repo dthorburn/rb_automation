@@ -1,0 +1,1 @@
+This has been more problematic than expected. I made a specific conda env that shouldn't be used for other things whilst it's still stable. Eventually, it would be good to replace this with a better solution with current versions of python and dssp. Maybe a task for Vlad. 
