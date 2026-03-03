@@ -10,7 +10,7 @@ The script operates via this logic:
     "proteins.fasta" - amino acid sequence of your modified nucleotide sequences without BSAI cut sites. 
 6. Double check the results by using biopython to create a translated temporary copy of amino acid sequence and compare with the proteins.fasta.
 
-(the script heavily relies on Biopython packages. Uncomment and run the first line if you don't have it installed)'''
+(the script heavily relies on Biopython libraries. Uncomment and run the first line if you don't have it installed)'''
 
 #Uncomment this line to install biopython
 #!python3 -m pip install biopython
