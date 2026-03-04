@@ -123,6 +123,14 @@ def run_process(filename):
         dna_results.append(SeqRecord(clean_dna, id=rec.id, description="BsaI_Cleaned_Stops_Deleted"))
         aa_results.append(SeqRecord(clean_dna.translate(), id=rec.id, description="Protein_Output"))
 
+    """ 
+    Specify the working directory where you want to output your results. Your results will be in clean_dna.fasta & proteins.fasta files. 
+    MODIFY SPECIFICALLY THIS PART WITH YOUR PREFERRED DIRECTORY: C:/Users/path/to/folder/
+
+    SeqIO.write(dna_results, "C:/Users/path/to/folder/clean_dna.fasta", "fasta-2line")
+    SeqIO.write(aa_results, "C:/Users/path/to/folder/proteins.fasta", "fasta-2line")
+
+    """
     #Save outputs to new FASTA files.
     SeqIO.write(dna_results, "clean_dna.fasta", "fasta-2line")
     SeqIO.write(aa_results, "proteins.fasta", "fasta-2line")
