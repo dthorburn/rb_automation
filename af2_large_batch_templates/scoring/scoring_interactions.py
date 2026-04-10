@@ -10,6 +10,7 @@ import statistics
 import collections
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import MDAnalysis as mda
 import MDAnalysis.lib.distances
 
@@ -269,31 +270,33 @@ if __name__ == "__main__":
     pdb_files = glob.glob(os.path.join(pdb_dir, "*.pdb"))
     total_files = len(pdb_files) 
 
-for idx, pdb_file in enumerate(pdb_files,start=1):
-    ## Generate the complex name based on the PDB file name
-    fname = os.path.basename(pdb_file)
-    sname = re.sub("_unrelaxed.*$", "", fname)
-    rname = re.sub(r"(^.*_unrelaxed_)(rank_[0-9]+)(_alphafold2.*$)", r"\2", fname)
-    print(f"Processing file {idx}/{total_files}: {sname}")
-    interaction_df, too_close_df, interaction_summ_df = find_residue_interactions_np(pdb_file, min_distance=min_distance, max_distance=max_distance)
-    all_interactions.append(interaction_df)
-    too_close_output.append(too_close_df)
-    interaction_summ.append(interaction_summ_df)
+    with tqdm(total=total_files, desc="Processing PDBs") as pbar:
+        for pdb_file in pdb_files:
+            ## Generate the complex name based on the PDB file name
+            fname = os.path.basename(pdb_file)
+            sname = re.sub("_unrelaxed.*$", "", fname)
+            rname = re.sub(r"(^.*_unrelaxed_)(rank_[0-9]+)(_alphafold2.*$)", r"\2", fname)
+            pbar.set_description(f"Processing PDB: {sname}")
+            interaction_df, too_close_df, interaction_summ_df = find_residue_interactions_np(pdb_file, min_distance=min_distance, max_distance=max_distance)
+            all_interactions.append(interaction_df)
+            too_close_output.append(too_close_df)
+            interaction_summ.append(interaction_summ_df)
 
-    ## pDockQ calculations
-    chain_coords, chain_plddt = read_pdb(pdb_file)
-    pdockq, ppv = calc_pdockq(chain_coords, chain_plddt, min_distance, max_distance)
-    pdockq_output.append({
-            "complex": sname,
-            "rank": rname,
-            "pdockq" : pdockq,
-            "pdockq_confidence" : ppv,
-            "chain_A_plddt_mean": round(statistics.mean(chain_plddt['A']), 3),
-            "chain_A_plddt_sd": round(statistics.stdev(chain_plddt['A']), 3),
-            "chain_B_plddt_mean": round(statistics.mean(chain_plddt['B']), 3),
-            "chain_B_plddt_sd": round(statistics.stdev(chain_plddt['B']), 3)
-        })
-
+            ## pDockQ calculations
+            chain_coords, chain_plddt = read_pdb(pdb_file)
+            pdockq, ppv = calc_pdockq(chain_coords, chain_plddt, min_distance, max_distance)
+            pdockq_output.append({
+                    "complex": sname,
+                    "rank": rname,
+                    "pdockq" : pdockq,
+                    "pdockq_confidence" : ppv,
+                    "chain_A_plddt_mean": round(statistics.mean(chain_plddt['A']), 3),
+                    "chain_A_plddt_sd": round(statistics.stdev(chain_plddt['A']), 3),
+                    "chain_B_plddt_mean": round(statistics.mean(chain_plddt['B']), 3),
+                    "chain_B_plddt_sd": round(statistics.stdev(chain_plddt['B']), 3)
+                })
+            pbar.update(1)
+            
     if all_interactions:
         combined_df = pd.concat(all_interactions, ignore_index=True)
         print(combined_df)
@@ -307,4 +310,4 @@ for idx, pdb_file in enumerate(pdb_files,start=1):
         merged_df1 = proximity_df.merge(pdockq_df, on=['complex', "rank"])
         merged_df2 = merged_df1.merge(ipae_df, on=['complex', "rank"]).drop_duplicates()
         print(merged_df2)
-        merged_df2.to_csv(scoring_output, index=False)
+        merged_df2.to_csv(proximity_output, index=False)
