@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 ## Taking the env variables
 BATCH_ID=$1
@@ -39,6 +39,7 @@ trap cleanup SIGTERM SIGINT
 ## Setting up a log file and starting. 
 LOGFILE="${WORKDIR}/RB_FloraFoldWatcher_batch${BATCH_ID}.log"
 exec > >(tee -a "$LOGFILE") 2>&1
+trap 'echo "==== WARN: Exited unexpectedly at line $LINENO, exit code $? ====" >> "$LOGFILE"' EXIT
 
 echo "====== Starting watcher at $(date) ======"
 #mkdir -p "${INPUT}/done"
@@ -54,16 +55,16 @@ while true; do
         echo "== Processing completed model: ${base_name} at $(date) =="
 
         ## Move output files
-        gsutil -m cp ${OUTPUT}/${base_name}*pdb "${GCP_OUTPUT_PATH}/"
-        gsutil -m cp ${OUTPUT}/${base_name}*json "${GCP_OUTPUT_PATH}/"
-        gsutil -m cp "$done_file" "${GCP_OUTPUT_PATH}/"
+        gsutil -m cp ${OUTPUT}/${base_name}*pdb "${GCP_OUTPUT_PATH}/" || true
+        gsutil -m cp ${OUTPUT}/${base_name}*json "${GCP_OUTPUT_PATH}/" || true
+        gsutil -m cp "$done_file" "${GCP_OUTPUT_PATH}/"  || true
         mv ${OUTPUT}/${base_name}* ${OUTPUT}/done || continue
 
         ## Move input to done folder
         input_file="${INPUT}/${base_name}.a3m"
         if [ -f "$input_file" ]; then
             mv "$input_file" "${INPUT}/done/"
-            gsutil -m mv "${GCP_INPUT_PATH}/${base_name}.a3m" "${GCP_INPUT_PATH}/done/"
+            gsutil -m mv "${GCP_INPUT_PATH}/${base_name}.a3m" "${GCP_INPUT_PATH}/done/" || true
         fi
     done
     ## Check every 10 seconds - needs to be considerably more often than the ~30 shutdown signal. 

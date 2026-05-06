@@ -6,7 +6,7 @@ gcp_image_project_id=""
 gcp_project_id=""
 gcp_service_account=""
 batches=
-root_bucker=""
+root_bucket=""
 run_name=""
 
 ## Zone list is not close to exhaustive for CPU only jobs. Generally, this isn't an issue.

@@ -57,17 +57,17 @@ ZONE=$(curl -s http://metadata.google.internal/computeMetadata/v1/instance/zone 
 gcloud compute instances stop "$INSTANCE_NAME" --zone="$ZONE" --quiet
 
 ## 6. make the disk image and instance template
-gcloud compute images create rb-florafold-launchtemplate0326 \
+gcloud compute images create rb-florafold-launchtemplate0526 \
     --project=${gcp_project_id} \
     --description=FloraFold\ \
-deployment\ disk\ with\ colabfold\ 1.6\ updated\ in\ 03/2026 \
+deployment\ disk\ with\ colabfold\ 1.6\ updated\ in\ 05/2026 \
     --source-disk=rb-florafoldpredict-template \
     --source-disk-zone=us-east4-c \
     --storage-location=us
-gcloud compute instance-templates create florafold-l4-template \
+gcloud compute instance-templates create florafold-l4-template-v3 \
   --machine-type=g2-custom-8-49152 \
   --accelerator=type=nvidia-l4,count=1 \
-  --create-disk=auto-delete=yes,boot=yes,image=projects/${gcp_project_id}/global/images/rb-florafold-launchtemplate0326,size=150,type=pd-ssd \
+  --create-disk=auto-delete=yes,boot=yes,image=projects/${gcp_project_id}/global/images/rb-florafold-launchtemplate0526,size=150,type=pd-ssd \
   --scopes=https://www.googleapis.com/auth/cloud-platform \
   --maintenance-policy=TERMINATE 
 
@@ -82,3 +82,24 @@ gcloud compute instances create rb-gpucfold-l4-${run_name}-${batch_id} \
   --source-instance-template=florafold-l4-template \
   --zone=${current_zone} \
   --metadata=startup-script=/home/miles/startup.sh,batch_id=${batch_id},models=${models},recycles=${recycles},root_bucket=${root_bucket}
+
+#### Additional steps added after first running
+## TO make it useable by other projects run the following
+gcp_service_account=""
+gcp_project_id=""
+gcp_image_project_id=""
+
+gcloud compute images add-iam-policy-binding rb-florafold-launchtemplate0526 \
+    --project="${gcp_image_project_id}" \
+    --member="serviceAccount:${gcp_service_account}" \
+    --role="roles/compute.imageUser"
+
+## The GCP project ID here is for the new project
+
+gcloud compute instance-templates create florafold-l4-template2 \
+  --machine-type=g2-custom-8-49152 \
+  --project=${gcp_project_id} \
+  --accelerator=type=nvidia-l4,count=1 \
+  --create-disk=auto-delete=yes,boot=yes,image=projects/${gcp_image_project_id}/global/images/rb-florafold-launchtemplate0526,size=150,type=pd-ssd \
+  --scopes=https://www.googleapis.com/auth/cloud-platform \
+  --maintenance-policy=TERMINATE 

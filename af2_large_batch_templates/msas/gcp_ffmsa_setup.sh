@@ -17,10 +17,12 @@ sudo apt-get update && sudo apt-get install -y \
   gnupg \
   lsb-release
 sudo apt-get install  -y seqkit
+
 git --version
 curl --version
 wget --version
 gcc --version
+seqkit version 
 
 ## 2. Make directories
 mkdir -p input/split
@@ -110,3 +112,15 @@ gcloud compute instances create rb-msaflorafold-${run_name}-${batch_id} \
   --source-instance-template=florafold-msa-template \
   --zone=${current_zone} \
   --metadata=startup-script=/home/miles/startup.sh,batch_id=${batch_id},root_bucket=${root_bucket}
+## TO make it useable by other projects run the following
+gcloud compute images add-iam-policy-binding rb-msaflorafold-launchtemplate0326 \
+    --project=spry-connection-368822 \
+    --member="serviceAccount:${gcp_service_account}" \
+    --role="roles/compute.imageUser"
+## The GCP project ID here is for the new project
+gcloud compute instance-templates create florafold-msa-template \
+  --project=${gcp_project_id} \
+  --machine-type=n2-custom-28-196608 \
+  --create-disk=auto-delete=yes,boot=yes,image=projects/${gcp_image_project_id}/global/images/rb-msaflorafold-launchtemplate0326,size=1200,type=pd-balanced \
+  --service-account=77770206554-compute@developer.gserviceaccount.com \
+  --scopes=https://www.googleapis.com/auth/cloud-platform
