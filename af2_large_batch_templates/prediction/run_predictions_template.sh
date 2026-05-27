@@ -52,7 +52,7 @@ do
         --disable-unified-memory \
         --num-recycle ${RECYCLES} \
         --num-models ${MODELS} \
-        ${INPUT} ${OUTPUT} &&
+        ${INPUT} ${OUTPUT} || true
     echo "== Finished ${batch_num} predicitons: `date` =="
     free -h
     sync && echo 3 | sudo -n tee /proc/sys/vm/drop_caches || true

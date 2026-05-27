@@ -288,8 +288,8 @@ if __name__ == "__main__":
             pdockq_output.append({
                     "complex": sname,
                     "rank": rname,
-                    "pdockq" : pdockq,
-                    "pdockq_confidence" : ppv,
+                    "rb_pdockq" : pdockq,
+                    "rb_pdockq_confidence" : ppv,
                     "chain_A_plddt_mean": round(statistics.mean(chain_plddt['A']), 3),
                     "chain_A_plddt_sd": round(statistics.stdev(chain_plddt['A']), 3),
                     "chain_B_plddt_mean": round(statistics.mean(chain_plddt['B']), 3),

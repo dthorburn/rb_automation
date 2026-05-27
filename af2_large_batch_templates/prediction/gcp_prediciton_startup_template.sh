@@ -37,7 +37,7 @@ sleep 5
 ## Run the job
 sudo -u miles bash ${WORKDIR}/run_predictions.sh "$BATCH_ID" "$MODELS" "$RECYCLES" "$ROOT_BUCKET" || true
 cp ${WORKDIR}/predictions/log.txt ${WORKDIR}/RB_FloraFoldPrediction_batch${BATCH_ID}.log
-pkill -9 -f watcher.sh
+#pkill -9 -f watcher.sh
 
 ## Shutting down the VM
 echo "==== Runner complete - Shutting down VM ===="
