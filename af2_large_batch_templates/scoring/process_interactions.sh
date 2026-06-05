@@ -15,6 +15,9 @@ WORKDIR="/home/miles"
 INPUT="${WORKDIR}/predictions"
 OUTPUT="${WORKDIR}/scored"
 
+## exporting PATH variable
+export PATH="/home/miles/miniconda3/envs/af2_scoring/bin:${PATH}"
+
 ## Reporting to log
 echo "====== RB FF50-Multimer Predictions ======"
 echo "Parameters:"

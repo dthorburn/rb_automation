@@ -26,12 +26,34 @@ def find_residue_interactions_np(pdb_file, min_distance=1.5, max_distance=5.0):
     rname = re.sub(r"(^.*_unrelaxed_)(rank_[0-9]+)(_alphafold2.*$)", r"\2", fname)
     complex_name = re.sub("_unrelaxed.*$", "", fname)
 
-    ## Load the structure using MDAnalysis
-    u = mda.Universe(pdb_file)
     ## Load the PAE JSON
     pdb_dir = os.path.dirname(pdb_file)
     json_name = re.sub("_unrelaxed.*$", "_predicted_aligned_error_v1.json", fname)
-    with open(pdb_dir + "/" + json_name, 'r') as json_file:
+    json_path = os.path.join(pdb_dir, json_name)
+    
+    if not os.path.exists(json_path):
+        print(f"Warning: PAE JSON file missing for {pdb_file}. Skipping.")
+        
+        # Match your exact fallback schema for empty states
+        df_empty = pd.DataFrame([{
+            "complex": complex_name, "rank": rname, "residue1": None, "chain1": None,
+            "residue1_num": None, "residue1_pae": None, "residue2": None, "chain2": None,
+            "residue2_num": None, "residue2_pae": None, "ipae": None, "distance": None
+        }])
+        df2_empty = pd.DataFrame([{
+            "complex": complex_name, "rank": rname, "close_atoms": None,
+            "close_residues": None, "min_distance_threshold": min_distance
+        }])
+        df3_empty = pd.DataFrame([{
+            "complex": complex_name, "rank": rname, "ipae_mean": None, "ipae_sd": None
+        }])
+        
+        return df_empty, df2_empty, df3_empty
+    
+    ## Load the structure using MDAnalysis
+    u = mda.Universe(pdb_file)
+
+    with open(json_path, 'r') as json_file:
         pj = json.load(json_file)
 
     ## Select non-hydrogen atoms
