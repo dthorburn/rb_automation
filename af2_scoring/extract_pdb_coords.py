@@ -2,13 +2,14 @@ import os
 import re
 import pdb
 import glob
+import json
 import argparse
 import statistics
+import collections
 import numpy as np
 import pandas as pd
 import MDAnalysis as mda
 import MDAnalysis.lib.distances
-from collections import defaultdict
 
 ## Redundant now. Use the NP implementation. 
 def find_residue_interactions(pdb_file, min_distance=1.5, max_distance=5.0, complex_name=None):
@@ -148,7 +149,7 @@ def find_residue_interactions_np(pdb_file, min_distance=1.5, max_distance=5.0, c
 def parse_atm_record(line):
     '''Get the atm record
     '''
-    record = defaultdict()
+    record = collections.defaultdict()
     record['name'] = line[0:6].strip()
     record['atm_no'] = int(line[6:11])
     record['atm_name'] = line[12:16].strip()
@@ -288,11 +289,9 @@ if __name__ == "__main__":
         combined_df.to_csv(interactions_output, index=False)
     else:
         print("No PDB files found or no interactions detected.")
-    if 
     if too_close_output and pdockq_output:
         pdockq_df = pd.DataFrame(pdockq_output)
         proximity_df = pd.concat(too_close_output, ignore_index=True)
-
         merged_df = proximity_df.merge(pdockq_df, on='complex')
         print(merged_df)
         merged_df.to_csv(scoring_output, index=False)
