@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-## To run use: process_interactions.sh "$ROOT_PATH" "$MINA" "$MAXA" "$PAEC" "$DISTC"
+## To run use: ./process_interactions.sh "$ROOT_PATH" "$MINA" "$MAXA" "$PAEC" "$DISTC"
 ## Use the af2_ss or af2_scoring conda environment, they should both have the same dependencies.
 
 INPUT_BUCKET=$1
