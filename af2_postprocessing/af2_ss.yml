@@ -1,10 +1,10 @@
 name: af2_ss
 channels:
   - conda-forge
-  - salilab 
+  - salilab
 
 dependencies:
-  - python=3.10
+  - python
   - numpy=1.26.*
   - pandas=2.1.*
   - mdanalysis=2.6.*
