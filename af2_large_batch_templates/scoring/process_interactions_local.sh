@@ -12,11 +12,9 @@ MAXA=$3
 PAEC=$4
 DISTC=$5
 
-GCP_INPUT_PATH="${INPUT_BUCKET}/predictions"
-GCP_OUTPUT_PATH="${INPUT_BUCKET}/scored"
+INPUT="${INPUT_BUCKET}/predictions"
+OUTPUT="${INPUT_BUCKET}/scored"
 WORKDIR="/home/resurrect/resurrectbio/01_projects/04_rb_automation/rb_automation/af2_large_batch_templates/scoring"
-INPUT="${WORKDIR}/predictions"
-OUTPUT="${WORKDIR}/scored"
 
 ## exporting PATH variable
 #export PATH="/home/miles/miniconda3/envs/af2_scoring/bin:${PATH}"
@@ -25,8 +23,8 @@ OUTPUT="${WORKDIR}/scored"
 echo "====== RB FF50-Multimer Predictions ======"
 echo "Parameters:"
 echo " - Date:        `date`"
-echo " - Input Path:  ${GCP_INPUT_PATH}"
-echo " - Output Path: ${GCP_OUTPUT_PATH}"
+echo " - Input Path:  ${INPUT}"
+echo " - Output Path: ${OUTPUT}"
 echo "==== Starting Run: `date` ===="
 
 ## Scoring step 1 - pDockQ, iPAE, contact nums
