@@ -49,19 +49,19 @@ for(temp_nlr in names(nlrs)){
 		if(tot_len >= length_cutoff){
 			incor_length <- incor_length + 1
 			if(incor_length == 1){
-				cat(file = paste0("./", long_out_name), temp_name, append = FALSE)
+				cat(file = paste0(long_out_name), temp_name, append = FALSE)
 			} else {
-				cat(file = paste0("./", long_out_name), temp_name, append = TRUE)
+				cat(file = paste0(long_out_name), temp_name, append = TRUE)
 			}
-			cat(file = paste0("./", long_out_name), temp_seq, append = TRUE)
+			cat(file = paste0(long_out_name), temp_seq, append = TRUE)
 		} else if(tot_len < length_cutoff){
 			cor_length <- cor_length + 1
 			if(cor_length == 1){
-				cat(file = paste0("./", output_name), temp_name, append = FALSE)
+				cat(file = paste0(output_name), temp_name, append = FALSE)
 			} else {
-				cat(file = paste0("./", output_name), temp_name, append = TRUE)
+				cat(file = paste0(output_name), temp_name, append = TRUE)
 			}
-			cat(file = paste0("./", output_name), temp_seq, append = TRUE)
+			cat(file = paste0(output_name), temp_seq, append = TRUE)
 		}
 	}
 }
