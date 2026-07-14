@@ -56,29 +56,29 @@ chmod 766 ./*sh
 conda create -n af2_scoring --file af2_scoring.yml
 
 ## Once everything is installed and ready, you can make an image and template
-gcloud compute images create rb-ffscoring-image0526 \
+gcloud compute images create rb-ffscoring-image0726 \
     --project=${gcp_project_id} \
     --description=FloraFold\ \
-scoring\ disk\ updated\ in\ 05/2026 \
+scoring\ disk\ updated\ in\ 07/2026 \
     --source-disk=rb-scoring-template-v1 \
     --source-disk-zone=us-west1-b \
     --storage-location=us
 
-gcloud compute instance-templates create rb-ffscoring-template-v1 \
+gcloud compute instance-templates create rb-ffscoring-template-v2 \
   --machine-type=e2-standard-8  \
-  --create-disk=auto-delete=yes,boot=yes,image=projects/${gcp_project_id}/global/images/rb-ffscoring-image0526,size=300,type=pd-ssd \
+  --create-disk=auto-delete=yes,boot=yes,image=projects/${gcp_project_id}/global/images/rb-ffscoring-image0726,size=300,type=pd-ssd \
   --scopes=https://www.googleapis.com/auth/cloud-platform 
 
 ## Only run this if you want to change the project it can be deployed one
-gcloud compute images add-iam-policy-binding rb-ffscoring-image0526 \
+gcloud compute images add-iam-policy-binding rb-ffscoring-image0726 \
     --project="${gcp_image_project_id}" \
     --member="serviceAccount:${gcp_service_account}" \
     --role="roles/compute.imageUser"
 
-gcloud compute instance-templates create rb-ffscoring-template-v1 \
+gcloud compute instance-templates create rb-ffscoring-template-v2 \
   --machine-type=e2-standard-8  \
   --project=${gcp_project_id} \
-  --create-disk=auto-delete=yes,boot=yes,image=projects/${gcp_image_project_id}/global/images/rb-ffscoring-image0526,size=300,type=pd-ssd \
+  --create-disk=auto-delete=yes,boot=yes,image=projects/${gcp_image_project_id}/global/images/rb-ffscoring-image0726,size=300,type=pd-ssd \
   --scopes=https://www.googleapis.com/auth/cloud-platform 
 
 
@@ -92,7 +92,7 @@ maxa=5
 paec=10
 distc=10
 gcloud compute instances create rb-ffscoring-${run_name} \
-                --source-instance-template=projects/${gcp_project_id}/global/instanceTemplates/rb-ffscoring-template-v1 \
+                --source-instance-template=projects/${gcp_project_id}/global/instanceTemplates/rb-ffscoring-template-v2 \
                 --project=${gcp_project_id} \
                 --service-account=${gcp_service_account} \
                 --scopes=https://www.googleapis.com/auth/cloud-platform \

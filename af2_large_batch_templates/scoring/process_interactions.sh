@@ -42,10 +42,10 @@ do
         ${OUTPUT}/${batch_num}_rawinteractions.csv \
         ${OUTPUT}/${batch_num}_scores.csv \
         --min_distance ${MINA} \
-        --max_distance ${MAXA}
+        --max_distance ${MAXA} || true
 
     ## Scoring step 2 - pTM, ipTM
-    grep -o "ptm.*" ./predictions/*.json | sed "s/_scores_/,/" | sed "s/_alphafold2.*json.ptm.. /,/" | sed "s/.*\\///" | sed "s/ .iptm...//" | sed "s/}//" >> ${OUTPUT}/${batch_num}_tmscores.csv
+    grep -o "ptm.*" ./predictions/*.json | sed "s/_scores_/,/" | sed "s/_alphafold2.*json.ptm../,/" | sed "s/.*\\///" | sed "s/ .iptm...//" | sed "s/}//" >> ${OUTPUT}/${batch_num}_tmscores.csv || true
 
     ## Scoring step 3 - ipSAE
     ## python ipsae.py <pae_json> <pdb> <pae_cutoff> <dist_cutoff>   
@@ -54,28 +54,28 @@ do
     do
         base_name=$(basename ${pdb_file})
         json_file=`echo ${pdb_file} | sed -e "s/_unrelaxed.*/_predicted_aligned_error_v1.json/"`
-        python ${WORKDIR}/ipsae.py ${json_file} ${pdb_file} ${PAEC} ${DISTC}
+        python ${WORKDIR}/ipsae.py ${json_file} ${pdb_file} ${PAEC} ${DISTC} || true
     done
     #echo "" > ${OUTPUT}/${batch_num}_ipsaefull.tsv
-    grep -h "max" ${INPUT}/*txt >> ${OUTPUT}/${batch_num}_ipsaefull.csv
-    sed -Ei 's/[[:space:]]+/,/g' ${OUTPUT}/${batch_num}_ipsaefull.csv
+    grep -h "max" ${INPUT}/*txt >> ${OUTPUT}/${batch_num}_ipsaefull.csv || true
+    sed -Ei 's/[[:space:]]+/,/g' ${OUTPUT}/${batch_num}_ipsaefull.csv || true
 
     ## STRETCH GOAL: Eventually add some kind of TMscore to estimate if the complex is stable or not. Not for version 1.
 
     ## Scoring step 4 - Secondary structure
     python ${WORKDIR}/secondary_structure.py ${INPUT} \
-        ${OUTPUT}/${batch_num}_ssfull.csv
+        ${OUTPUT}/${batch_num}_ssfull.csv || true
 
     python ${WORKDIR}/merge_results.py ${OUTPUT}/${batch_num}_scores.csv \
         ${OUTPUT}/${batch_num}_tmscores.csv \
         ${OUTPUT}/${batch_num}_ssfull.csv \
         ${OUTPUT}/${batch_num}_ipsaefull.csv \
-        ${OUTPUT}/${batch_num}_final_summary.csv
+        ${OUTPUT}/${batch_num}_final_summary.csv || true
 
     rm ${INPUT}/*
-    gcloud storage cp ${OUTPUT}/${batch_num}_final_summary.csv ${GCP_OUTPUT_PATH}/
-    mv ${OUTPUT}/${batch_num}_final_summary.csv ${WORKDIR}/completed/
-    gcloud storage cp ${OUTPUT}/${batch_num}_* ${GCP_OUTPUT_PATH}/individual_scores/
-    mv ${OUTPUT}/${batch_num}_* ${WORKDIR}/completed/
+    gcloud storage cp ${OUTPUT}/${batch_num}_final_summary.csv ${GCP_OUTPUT_PATH}/ || true
+    mv ${OUTPUT}/${batch_num}_final_summary.csv ${WORKDIR}/completed/ || true
+    gcloud storage cp ${OUTPUT}/${batch_num}_* ${GCP_OUTPUT_PATH}/individual_scores/ || true
+    mv ${OUTPUT}/${batch_num}_* ${WORKDIR}/completed/ || true
     #rm ${OUTPUT}/*
 done
