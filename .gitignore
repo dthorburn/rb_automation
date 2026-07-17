@@ -9,4 +9,4 @@
 *.log
 *.tsv
 *.pdb
-
+*notemplate.sh
