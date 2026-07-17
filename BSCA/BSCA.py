@@ -15,6 +15,7 @@ The script operates via this logic:
 #Uncomment this line to install biopython
 #!python3 -m pip install biopython
 import os
+import sys
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -92,50 +93,49 @@ def BSA1rem_and_delete_stops(record):
     final_seq = delete_terminal_stop(seq_str)
     return Seq(final_seq)
 
-def run_process(filename):
+def run_process(input_path):
     """Handles file input/output and verifies that the protein sequence wasn't corrupted."""
     #Checks if files exists to begin with
-    if not os.path.exists(filename):
-        print(f"File {filename} not found.")
+    if not os.path.exists(input_path):
+        print(f"Error: File {input_path} not found.")
         return
 
-    #Use 'fasta-pearson' to deal with header formatting
-    records = list(SeqIO.parse(filename, "fasta-pearson"))
+  # Determine the directory and base name of the input file
+    input_dir = os.path.dirname(os.path.abspath(input_path))
+    
+    # Define output paths based on the input directory
+    dna_out = os.path.join(input_dir, "cleaned_dna.fasta")
+    aa_out = os.path.join(input_dir, "proteins.fasta")
+
+    records = list(SeqIO.parse(input_path, "fasta"))
     dna_results, aa_results = [], []
 
     for rec in records:
-        #Process the sequence
         clean_dna = BSA1rem_and_delete_stops(rec)
         
-        #VERIFICATION stage: Create a reference by deleting stops from original DNA.
+        # Verification
         base_dna_deleted = delete_terminal_stop(str(rec.seq).upper().strip())
-        
-        #Translate both into amino acids (removing the '*' symbol for comparison).
         orig_pro = str(Seq(base_dna_deleted).translate(table=1)).replace('*', '')
         new_pro = str(clean_dna.translate(table=1)).replace('*', '')
         
         if orig_pro == new_pro:
-            print(f"{rec.id}: Match. BsaI sites removed and Stop codons deleted.")
+            print(f"{rec.id}: OK (BsaI removed)")
         else:
-            print(f"{rec.id}: MISMATCH! Protein changed during BSAI site removal.")
+            print(f"{rec.id}: MISMATCH! Protein sequence altered.")
             
-        #Wrap the new sequence in SeqRecord objects for saving.
-        dna_results.append(SeqRecord(clean_dna, id=rec.id, description="BsaI_Cleaned_Stops_Deleted"))
+        dna_results.append(SeqRecord(clean_dna, id=rec.id, description="BsaI_Cleaned"))
         aa_results.append(SeqRecord(clean_dna.translate(), id=rec.id, description="Protein_Output"))
 
-    """ 
-    Specify the working directory where you want to output your results. Your results will be in clean_dna.fasta & proteins.fasta files. 
-    MODIFY SPECIFICALLY THIS PART WITH YOUR PREFERRED DIRECTORY: C:/Users/path/to/folder/
+    # Save outputs to the same directory as the input file
+    SeqIO.write(dna_results, dna_out, "fasta-2line")
+    SeqIO.write(aa_results, aa_out, "fasta-2line")
+    
+    print(f"\nResults saved in: {input_dir}")
+    print(f"Files: 'cleaned_dna.fasta' and 'proteins.fasta'")
 
-    SeqIO.write(dna_results, "C:/Users/path/to/folder/clean_dna.fasta", "fasta-2line")
-    SeqIO.write(aa_results, "C:/Users/path/to/folder/proteins.fasta", "fasta-2line")
-
-    """
-    #Save outputs to new FASTA files.
-    SeqIO.write(dna_results, "clean_dna.fasta", "fasta-2line")
-    SeqIO.write(aa_results, "proteins.fasta", "fasta-2line")
-    print("\nBSAI sites were removed")
-
-"""Ensure your filename and path is correct. It should be nucleotide sequences with BSAI cut sites."""
-
-run_process("C:/Users/BioData/sequences/YourFileName.fasta")
+if __name__ == "__main__":
+    # Check if the user provided a filename argument
+    if len(sys.argv) < 2:
+        print("Usage: python BSCA.py <your_fasta_file.fasta>")
+    else:
+        run_process(sys.argv[1])
