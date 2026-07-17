@@ -14,7 +14,8 @@ DISTC=$5
 
 INPUT="${INPUT_BUCKET}/predictions"
 OUTPUT="${INPUT_BUCKET}/scored"
-WORKDIR="/home/resurrect/resurrectbio/01_projects/04_rb_automation/rb_automation/af2_large_batch_templates/scoring"
+WORKDIR="/home/dthorbur/Resurrect_Bio/Scripts/rb_automation/af2_large_batch_templates/scoring"
+mkdir -p ${OUTPUT}
 
 ## exporting PATH variable
 #export PATH="/home/miles/miniconda3/envs/af2_scoring/bin:${PATH}"
@@ -36,7 +37,7 @@ python ${WORKDIR}/scoring_interactions.py ${INPUT} \
     echo "Scoring step 1 complete"
 
 ## Scoring step 2 - pTM, ipTM
-grep -o "ptm.*" ./predictions/*.json | sed "s/_scores_/,/" | sed "s/_alphafold2.*json.ptm.. /,/" | sed "s/.*\\///" | sed "s/ .iptm...//" | sed "s/}//" >> ${OUTPUT}/run_tmscores.csv
+grep -o "ptm.*" ./predictions/*.json | sed "s/_scores_/,/" | sed "s/_alphafold2.*json.ptm../,/" | sed "s/.*\\///" | sed "s/ .iptm...//" | sed "s/}//" >> ${OUTPUT}/run_tmscores.csv
 echo "Scoring step 2 complete"
 
 ## Scoring step 3 - ipSAE
