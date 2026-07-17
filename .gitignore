@@ -1,4 +1,8 @@
 ## Directories
+**/predictions
+**/scored
+**/msas
+**/.vscode
 
 ## Files
 *.csv

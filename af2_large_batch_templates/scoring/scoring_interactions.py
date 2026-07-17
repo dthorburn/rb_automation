@@ -1,6 +1,8 @@
+## This script is written to parse directories with all the models for an interaction between 2 proteins. 
+## This includes scoring pDockQ, iPAE, as well as identifying proportion unstructured.
+## Using the af2_ss package
 import os
 import re
-import pdb
 import glob
 import json
 import argparse
@@ -8,64 +10,52 @@ import statistics
 import collections
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 import MDAnalysis as mda
 import MDAnalysis.lib.distances
 
-## Redundant now. Use the NP implementation. 
-def find_residue_interactions(pdb_file, min_distance=1.5, max_distance=5.0, complex_name=None):
-    ## If complex_name is not provided, generate it from the file name
-    if complex_name is None:
-        fname = os.path.basename(pdb_file)
-        complex_name = re.sub("_unrelaxed.*$", "", fname)
-    ## Load the structure using MDAnalysis
-    interactions = []
-    u = mda.Universe(pdb_file)
-    chain_A = u.select_atoms("segid A")
-    ## Iterate through each residue in chain A and find nearby residues
-    for residue in chain_A.residues:
-        ## Select atoms within max_distance from the current residue
-        nearby_residues = u.select_atoms(f"around {max_distance} (not name H* and resid {residue.resid})")
-        for nearby_residue in nearby_residues.residues:
-            ## Only process interactions on different chains
-            if residue.segid != nearby_residue.segid:
-                ## Calculate the minimum distance between the residues
-                distance = np.min(mda.lib.distances.distance_array(residue.atoms.positions, nearby_residue.atoms.positions))                
-                ## Only add the interaction if the distance is within the specified range
-                if min_distance <= distance <= max_distance:
-                    interactions.append({
-                        "complex": complex_name,
-                        "residue1": f"{residue.resname}{residue.resid}",
-                        "chain1": residue.segid,
-                        "residue1_num": residue.resid,
-                        "residue2": f"{nearby_residue.resname}{nearby_residue.resid}",
-                        "chain2": nearby_residue.segid,
-                        "residue2_num": nearby_residue.resid,
-                        "distance": round(distance, 3)  # Rounded to 3 decimal places
-                    })
-    if interactions:
-        df = pd.DataFrame(interactions)
-        # This isn't the most efficient, but my other solutions didn't work.... 
-        # df_subset = df[df["chain1"] == "A"]
-    else:
-        df = pd.DataFrame([{
-            "complex": complex_name,
-            "residue1": None,
-            "chain1": None,
-            "residue1_num": None,
-            "residue2": None,
-            "chain2": None,
-            "residue2_num": None,
-            "distance": None
-        }])
-    return df
-
-def find_residue_interactions_np(pdb_file, min_distance=1.5, max_distance=5.0, complex_name=None):
+## Debugging example
+#pdb_file = "/mnt/c/Users/miles/Documents/Resurrect_Bio/Projects/09_commercialagreements/02_corn/05_interactions/scoring/files/Ts20_Zm1_Mo18W_913.ff50_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000.pdb"
+#####################
+##    Functions    ##
+#####################
+## There is an assumption that the PAE json is in the same directory.
+def find_residue_interactions_np(pdb_file, min_distance=1.5, max_distance=5.0):
     ## Generate complex name from file name if not provided
-    if complex_name is None:
-        fname = os.path.basename(pdb_file)
-        complex_name = re.sub("_unrelaxed.*$", "", fname)
+    fname = os.path.basename(pdb_file)
+    rname = re.sub(r"(^.*_unrelaxed_)(rank_[0-9]+)(_alphafold2.*$)", r"\2", fname)
+    complex_name = re.sub("_unrelaxed.*$", "", fname)
+
+    ## Load the PAE JSON
+    pdb_dir = os.path.dirname(pdb_file)
+    json_name = re.sub("_unrelaxed.*$", "_predicted_aligned_error_v1.json", fname)
+    json_path = os.path.join(pdb_dir, json_name)
+    
+    if not os.path.exists(json_path):
+        print(f"Warning: PAE JSON file missing for {pdb_file}. Skipping.")
+        
+        # Match your exact fallback schema for empty states
+        df_empty = pd.DataFrame([{
+            "complex": complex_name, "rank": rname, "residue1": None, "chain1": None,
+            "residue1_num": None, "residue1_pae": None, "residue2": None, "chain2": None,
+            "residue2_num": None, "residue2_pae": None, "ipae": None, "distance": None
+        }])
+        df2_empty = pd.DataFrame([{
+            "complex": complex_name, "rank": rname, "close_atoms": None,
+            "close_residues": None, "min_distance_threshold": min_distance
+        }])
+        df3_empty = pd.DataFrame([{
+            "complex": complex_name, "rank": rname, "ipae_mean": None, "ipae_sd": None
+        }])
+        
+        return df_empty, df2_empty, df3_empty
+    
     ## Load the structure using MDAnalysis
     u = mda.Universe(pdb_file)
+
+    with open(json_path, 'r') as json_file:
+        pj = json.load(json_file)
+
     ## Select non-hydrogen atoms
     chain_A = u.select_atoms("segid A and not name H*")
     chain_B = u.select_atoms("segid B and not name H*")
@@ -82,6 +72,7 @@ def find_residue_interactions_np(pdb_file, min_distance=1.5, max_distance=5.0, c
     num_contacts = np.sum(contact_mask)
     ## Store interactions, but only one per residue pair
     interactions = []
+    sum_dat = []
     processed_pairs = set()  
     ## Iterate over close contacts (i.e., atom pairs within the distance threshold)
     ## zip(*tuple) pairs up the elements in the array objects. (i.e., output=(array([0, 1, 3]), array([4, 2, 5])) will become (0,4);(1,2);(3,5))
@@ -92,31 +83,59 @@ def find_residue_interactions_np(pdb_file, min_distance=1.5, max_distance=5.0, c
         residue_B = atom_B.residue
         ## Check if this residue pair has been processed already
         if (residue_A.resid, residue_B.resid) not in processed_pairs:
+            ipae_values = []
+            ## 0-indexed correction
+            res_A_idx = residue_A.resid - 1
+            res_B_idx = residue_B.resid - 1
+            ipae_values.append(pj['predicted_aligned_error'][1][res_A_idx])
+            ipae_values.append(pj['predicted_aligned_error'][2][res_B_idx])
+            mean_ipae = np.mean(ipae_values)
             interactions.append({
                 "complex": complex_name,
+                "rank": rname,
                 "residue1": f"{residue_A.resname}{residue_A.resid}",
                 "chain1": residue_A.segid,
                 "residue1_num": residue_A.resid,
+                "residue1_pae": ipae_values[0],
                 "residue2": f"{residue_B.resname}{residue_B.resid}",
                 "chain2": residue_B.segid,
                 "residue2_num": residue_B.resid,
+                "residue2_pae": ipae_values[1],
+                "ipae": mean_ipae,
                 "distance": round(distances[i, j], 3)  # Round to 3 decimal places
             })
             ## Mark this residue pair as processed
             processed_pairs.add((residue_A.resid, residue_B.resid))
     if interactions:
         df = pd.DataFrame(interactions)
+        ## Summarising data per complex ipae
+        df3 = pd.DataFrame([{
+            "complex": complex_name,
+            "rank": rname,
+            "ipae_mean": np.mean(df["ipae"]),
+            "ipae_sd": np.std(df["ipae"])
+        }])
     else:
         ## If no interactions, return an empty DataFrame with expected columns
         df = pd.DataFrame([{
             "complex": complex_name,
+            "rank": rname,
             "residue1": None,
             "chain1": None,
             "residue1_num": None,
+            "residue1_pae": None,
             "residue2": None,
             "chain2": None,
             "residue2_num": None,
+            "residue2_pae": None,
+            "ipae": None,
             "distance": None
+        }])
+        df3 = pd.DataFrame([{
+            "complex": complex_name,
+            "rank": rname,
+            "ipae_mean": None,
+            "ipae_sd": None
         }])
     ## Calculating number of residues that are too close. 
     processed_too_close = set()
@@ -130,6 +149,7 @@ def find_residue_interactions_np(pdb_file, min_distance=1.5, max_distance=5.0, c
     if processed_too_close:
         int_close = {
             "complex": complex_name,
+            "rank": rname,
             "close_atoms" : len(too_close[0]),
             "close_residues" : len(processed_too_close),
             "min_distance_threshold": min_distance
@@ -138,11 +158,12 @@ def find_residue_interactions_np(pdb_file, min_distance=1.5, max_distance=5.0, c
     else:
         df2 = pd.DataFrame([{
             "complex": complex_name,
+            "rank": rname,
             "close_atoms" : None,
             "close_residues" : None,
             "min_distance_threshold": min_distance
         }])
-    return df, df2
+    return df, df2, df3
 
 ## These functions to calculate updated pDockQ score are taken from where the paper indicates: https://gitlab.com/ElofssonLab/FoldDock/-/blob/main/src/pdockq.py?ref_type=heads
 ## parse_atm_record and read_pdb are kept the same. calc_pdockq is updated.
@@ -235,6 +256,10 @@ def calc_pdockq(chain_coords, chain_plddt, min_distance, max_distance):
             ppv = PPV[0]
     return pdockq, ppv
 
+
+#####################
+##     Running     ##
+#####################
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Find interactions between amino acids in different chains in all PDB files in a directory.")
     # Positional arguments for the PDB directory and output files
@@ -254,44 +279,57 @@ if __name__ == "__main__":
     min_distance = args.min_distance
     max_distance = args.max_distance
 
+    ## Debugging
+    #pdb_dir="/mnt/c/Users/miles/Documents/Resurrect_Bio/Projects/09_commercialagreements/02_corn/05_interactions/scoring/files/"
+    #min_distance=1.5
+    #max_distance=5.0
+
     all_interactions = []
+    interaction_summ = []
     too_close_output = []
     pdockq_output = []
 
     pdb_files = glob.glob(os.path.join(pdb_dir, "*.pdb"))
     total_files = len(pdb_files) 
 
-    for idx, pdb_file in enumerate(pdb_files,start=1):
-        ## Generate the complex name based on the PDB file name
-        fname = os.path.basename(pdb_file)
-        sname = re.sub("_unrelaxed.*$", "", fname)
-        print(f"Processing file {idx}/{total_files}: {sname}")
-        interaction_df, too_close_df = find_residue_interactions_np(pdb_file, min_distance=min_distance, max_distance=max_distance, complex_name=sname)
-        all_interactions.append(interaction_df)
-        too_close_output.append(too_close_df)
+    with tqdm(total=total_files, desc="Processing PDBs") as pbar:
+        for pdb_file in pdb_files:
+            ## Generate the complex name based on the PDB file name
+            fname = os.path.basename(pdb_file)
+            sname = re.sub("_unrelaxed.*$", "", fname)
+            rname = re.sub(r"(^.*_unrelaxed_)(rank_[0-9]+)(_alphafold2.*$)", r"\2", fname)
+            pbar.set_description(f"Processing PDB: {sname}")
+            interaction_df, too_close_df, interaction_summ_df = find_residue_interactions_np(pdb_file, min_distance=min_distance, max_distance=max_distance)
+            all_interactions.append(interaction_df)
+            too_close_output.append(too_close_df)
+            interaction_summ.append(interaction_summ_df)
 
-        ## pDockQ calculations
-        chain_coords, chain_plddt = read_pdb(pdb_file)
-        pdockq, ppv = calc_pdockq(chain_coords, chain_plddt, min_distance, max_distance)
-        pdockq_output.append({
-                "complex": sname,
-                "pdockq" : pdockq,
-                "pdockq_confidence" : ppv,
-                "chain_A_plddt_mean": round(statistics.mean(chain_plddt['A']), 3),
-                "chain_A_plddt_sd": round(statistics.stdev(chain_plddt['A']), 3),
-                "chain_B_plddt_mean": round(statistics.mean(chain_plddt['B']), 3),
-                "chain_B_plddt_sd": round(statistics.stdev(chain_plddt['B']), 3)
-            })
-
+            ## pDockQ calculations
+            chain_coords, chain_plddt = read_pdb(pdb_file)
+            pdockq, ppv = calc_pdockq(chain_coords, chain_plddt, min_distance, max_distance)
+            pdockq_output.append({
+                    "complex": sname,
+                    "rank": rname,
+                    "rb_pdockq" : pdockq,
+                    "rb_pdockq_confidence" : ppv,
+                    "chain_A_plddt_mean": round(statistics.mean(chain_plddt['A']), 3),
+                    "chain_A_plddt_sd": round(statistics.stdev(chain_plddt['A']), 3),
+                    "chain_B_plddt_mean": round(statistics.mean(chain_plddt['B']), 3),
+                    "chain_B_plddt_sd": round(statistics.stdev(chain_plddt['B']), 3)
+                })
+            pbar.update(1)
+            
     if all_interactions:
         combined_df = pd.concat(all_interactions, ignore_index=True)
         print(combined_df)
         combined_df.to_csv(interactions_output, index=False)
     else:
         print("No PDB files found or no interactions detected.")
-    if too_close_output and pdockq_output:
+    if too_close_output and pdockq_output and interaction_summ:
         pdockq_df = pd.DataFrame(pdockq_output)
         proximity_df = pd.concat(too_close_output, ignore_index=True)
-        merged_df = proximity_df.merge(pdockq_df, on='complex')
-        print(merged_df)
-        merged_df.to_csv(scoring_output, index=False)
+        ipae_df = pd.concat(interaction_summ, ignore_index=True)
+        merged_df1 = proximity_df.merge(pdockq_df, on=['complex', "rank"])
+        merged_df2 = merged_df1.merge(ipae_df, on=['complex', "rank"]).drop_duplicates()
+        print(merged_df2)
+        merged_df2.to_csv(proximity_output, index=False)
